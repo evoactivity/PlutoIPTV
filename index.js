@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const request = require('request');
 const j2x = require('jsontoxml');
 const moment = require('moment');
