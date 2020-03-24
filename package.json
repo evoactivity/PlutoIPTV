@@ -1,8 +1,8 @@
 {
-  "name": "plutoIPTV",
+  "name": "pluto-iptv",
   "version": "1.0.0",
   "description": "pluto.tv to XMLTV & M3U converter",
-  "main": "init.js",
+  "main": "index.js",
   "dependencies": {
     "fs-extra": "^9.0.0",
     "jsontoxml": "^1.0.1",
@@ -11,14 +11,12 @@
   },
   "devDependencies": {},
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "pluto-iptv": "node index.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/evoactivity/PlutoIPTV.git"
-  },
-  "author": "",
-  "license": "ISC",
+  "repository": "git+https://github.com/evoactivity/PlutoIPTV.git",
+  "author": "Liam Potter <liam@liampotter.co.uk>",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/evoactivity/PlutoIPTV/issues"
   },
