@@ -9,7 +9,7 @@ Based on https://github.com/TylerB260/PlutoXML
 Run
 
 ```bash
-$ > npx pluto-iptv
+$ npx pluto-iptv
 ```
 
 This will create an `epg.xml` file and a `playlist.m3u` file
