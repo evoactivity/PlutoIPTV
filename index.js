@@ -64,34 +64,34 @@ plutoIPTV.grabJSON(function(err, channels) {
   let m3u8 = '';
 
   channels.forEach(channel => {
-    let m3uUrl = new URL(channel.stitched.urls[0].url);
-    let queryString = url.search;
-    let params = new URLSearchParams(queryString);
-
-    // set the url params
-    params.set('id', '101');
-    params.set('advertisingId', '1');
-    params.set('appName', 'test');
-    params.set('appVersion', 'unknown');
-    params.set('architecture', 'x86');
-    params.set('buildVersion', '1.0.0');
-    params.set('clientTime', '0');
-    params.set('deviceDNT', '1');
-    params.set('deviceId', '90');
-    params.set('deviceLat', '0.0');
-    params.set('deviceLon', '0.0');
-    params.set('deviceMake', 'test');
-    params.set('deviceModel', 'test');
-    params.set('deviceType', 'test');
-    params.set('deviceVersion', 'test');
-    params.set('includeExtendedEvents', 'false');
-    params.set('sid', '123');
-    params.set('userId', '321');
-
-    m3uUrl.search = params.toString();
-    m3uUrl = m3uUrl.toString();
-
     if (channel.isStitched) {
+      let m3uUrl = new URL(channel.stitched.urls[0].url);
+      let queryString = url.search;
+      let params = new URLSearchParams(queryString);
+
+      // set the url params
+      params.set('id', '101');
+      params.set('advertisingId', '1');
+      params.set('appName', 'test');
+      params.set('appVersion', 'unknown');
+      params.set('architecture', 'x86');
+      params.set('buildVersion', '1.0.0');
+      params.set('clientTime', '0');
+      params.set('deviceDNT', '1');
+      params.set('deviceId', '90');
+      params.set('deviceLat', '0.0');
+      params.set('deviceLon', '0.0');
+      params.set('deviceMake', 'test');
+      params.set('deviceModel', 'test');
+      params.set('deviceType', 'test');
+      params.set('deviceVersion', 'test');
+      params.set('includeExtendedEvents', 'false');
+      params.set('sid', '123');
+      params.set('userId', '321');
+
+      m3uUrl.search = params.toString();
+      m3uUrl = m3uUrl.toString();
+
       let slug = channel.slug;
       let logo = channel.solidLogoPNG.path;
       let group = channel.category;
