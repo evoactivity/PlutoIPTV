@@ -4,6 +4,8 @@ const request = require('request');
 const j2x = require('jsontoxml');
 const moment = require('moment');
 const fs = require('fs-extra');
+const uuid4 = require('uuid').v4;
+const uuid1 = require('uuid').v1;
 const url = require('url');
 
 const plutoIPTV = {
@@ -62,32 +64,31 @@ plutoIPTV.grabJSON(function(err, channels) {
   ///////////////////
 
   let m3u8 = '';
-
   channels.forEach(channel => {
+    let deviceId = uuid1();
+    let sid = uuid4();
     if (channel.isStitched) {
       let m3uUrl = new URL(channel.stitched.urls[0].url);
       let queryString = url.search;
       let params = new URLSearchParams(queryString);
 
       // set the url params
-      params.set('id', '101');
-      params.set('advertisingId', '1');
-      params.set('appName', 'test');
+      params.set('advertisingId', '');
+      params.set('appName', 'web');
       params.set('appVersion', 'unknown');
-      params.set('architecture', 'x86');
-      params.set('buildVersion', '1.0.0');
+      params.set('appStoreUrl', '');
+      params.set('architecture', '');
+      params.set('buildVersion', '');
       params.set('clientTime', '0');
-      params.set('deviceDNT', '1');
-      params.set('deviceId', '90');
-      params.set('deviceLat', '0.0');
-      params.set('deviceLon', '0.0');
-      params.set('deviceMake', 'test');
-      params.set('deviceModel', 'test');
-      params.set('deviceType', 'test');
-      params.set('deviceVersion', 'test');
+      params.set('deviceDNT', '0');
+      params.set('deviceId', deviceId);
+      params.set('deviceMake', 'Chrome');
+      params.set('deviceModel', 'web');
+      params.set('deviceType', 'web');
+      params.set('deviceVersion', 'unknown');
       params.set('includeExtendedEvents', 'false');
-      params.set('sid', '123');
-      params.set('userId', '321');
+      params.set('sid', sid);
+      params.set('userId', '');
 
       m3uUrl.search = params.toString();
       m3uUrl = m3uUrl.toString();
@@ -119,74 +120,77 @@ ${m3uUrl}
   // Channels //
   //////////////
   channels.forEach(channel => {
-    tv.push({
-      name: 'channel',
-      attrs: { id: channel.slug },
-      children: [
-        { name: 'display-name', text: channel.name },
-        { name: 'display-name', text: channel.number },
-        { name: 'desc', text: channel.summary },
-        { name: 'icon', attrs: { src: channel.solidLogoPNG.path } }
-      ]
-    });
-
-    //////////////
-    // Episodes //
-    //////////////
-
-    channel.timelines.forEach(programme => {
-      console.log(
-        '[INFO] Adding instance of ' +
-          programme.title +
-          ' to channel ' +
-          channel.name +
-          '.'
-      );
-
+    if (channel.isStitched) {
       tv.push({
-        name: 'programme',
-        attrs: {
-          start: moment(programme.start).format('YYYYMMDDHHmmss ZZ'),
-          stop: moment(programme.stop).format('YYYYMMDDHHmmss ZZ'),
-          channel: channel.slug
-        },
+        name: 'channel',
+        attrs: { id: channel.slug },
         children: [
-          { name: 'title', attrs: { lang: 'en' }, text: programme.title },
-          {
-            name: 'sub-title',
-            attrs: { lang: 'en' },
-            text:
-              programme.title == programme.episode.name
-                ? ''
-                : programme.episode.name
-          },
-          {
-            name: 'desc',
-            attrs: { lang: 'en' },
-            text: programme.episode.description
-          },
-          {
-            name: 'date',
-            text: moment(programme.episode.firstAired).format('YYYYMMDD')
-          },
-          {
-            name: 'category',
-            attrs: { lang: 'en' },
-            text: programme.episode.genre
-          },
-          {
-            name: 'category',
-            attrs: { lang: 'en' },
-            text: programme.episode.subGenre
-          },
-          {
-            name: 'episode-num',
-            attrs: { system: 'onscreen' },
-            text: programme.episode.number
-          }
+          { name: 'display-name', text: channel.name },
+          { name: 'display-name', text: channel.number },
+          { name: 'desc', text: channel.summary },
+          { name: 'icon', attrs: { src: channel.solidLogoPNG.path } }
         ]
       });
-    });
+
+      //////////////
+      // Episodes //
+      //////////////
+      if (channel.timelines) {
+        channel.timelines.forEach(programme => {
+          console.log(
+            '[INFO] Adding instance of ' +
+              programme.title +
+              ' to channel ' +
+              channel.name +
+              '.'
+          );
+
+          tv.push({
+            name: 'programme',
+            attrs: {
+              start: moment(programme.start).format('YYYYMMDDHHmmss ZZ'),
+              stop: moment(programme.stop).format('YYYYMMDDHHmmss ZZ'),
+              channel: channel.slug
+            },
+            children: [
+              { name: 'title', attrs: { lang: 'en' }, text: programme.title },
+              {
+                name: 'sub-title',
+                attrs: { lang: 'en' },
+                text:
+                  programme.title == programme.episode.name
+                    ? ''
+                    : programme.episode.name
+              },
+              {
+                name: 'desc',
+                attrs: { lang: 'en' },
+                text: programme.episode.description
+              },
+              {
+                name: 'date',
+                text: moment(programme.episode.firstAired).format('YYYYMMDD')
+              },
+              {
+                name: 'category',
+                attrs: { lang: 'en' },
+                text: programme.episode.genre
+              },
+              {
+                name: 'category',
+                attrs: { lang: 'en' },
+                text: programme.episode.subGenre
+              },
+              {
+                name: 'episode-num',
+                attrs: { system: 'onscreen' },
+                text: programme.episode.number
+              }
+            ]
+          });
+        });
+      }
+    }
   });
 
   let epg = j2x(

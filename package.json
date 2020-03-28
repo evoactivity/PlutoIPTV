@@ -1,13 +1,14 @@
 {
   "name": "pluto-iptv",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "pluto.tv to XMLTV & M3U converter",
   "main": "index.js",
   "dependencies": {
     "fs-extra": "^9.0.0",
     "jsontoxml": "^1.0.1",
     "moment": "^2.24.0",
-    "request": "^2.88.2"
+    "request": "^2.88.2",
+    "uuid": "^7.0.2"
   },
   "devDependencies": {},
   "scripts": {
