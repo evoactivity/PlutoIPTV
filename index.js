@@ -9,8 +9,8 @@ const uuid1 = require('uuid').v1;
 const url = require('url');
 
 const plutoIPTV = {
-  grabJSON: function(callback) {
-    callback = callback || function() {};
+  grabJSON: function (callback) {
+    callback = callback || function () {};
 
     console.log('[INFO] Grabbing EPG...');
 
@@ -37,34 +37,32 @@ const plutoIPTV = {
 
     // 2020-03-25%2005%3A00%3A00.000%2B0000
     let stopTime = encodeURIComponent(
-      moment()
-        .add(8, 'hours')
-        .format('YYYY-MM-DD HH:00:00.000ZZ')
+      moment().add(8, 'hours').format('YYYY-MM-DD HH:00:00.000ZZ')
     );
 
     let url = `http://api.pluto.tv/v2/channels?start=${startTime}&stop=${stopTime}`;
 
     console.log(url);
 
-    request(url, function(err, code, raw) {
+    request(url, function (err, code, raw) {
       console.log('[DEBUG] Using api.pluto.tv, writing cache.json.');
       fs.writeFileSync('cache.json', raw);
 
       callback(err || false, JSON.parse(raw));
       return;
     });
-  }
+  },
 };
 
 module.exports = plutoIPTV;
 
-plutoIPTV.grabJSON(function(err, channels) {
+plutoIPTV.grabJSON(function (err, channels) {
   ///////////////////
   // M3U8 Playlist //
   ///////////////////
 
   let m3u8 = '';
-  channels.forEach(channel => {
+  channels.forEach((channel) => {
     let deviceId = uuid1();
     let sid = uuid4();
     if (channel.isStitched) {
@@ -89,6 +87,7 @@ plutoIPTV.grabJSON(function(err, channels) {
       params.set('includeExtendedEvents', 'false');
       params.set('sid', sid);
       params.set('userId', '');
+      params.set('serverSideAds', 'true');
 
       m3uUrl.search = params.toString();
       m3uUrl = m3uUrl.toString();
@@ -119,7 +118,7 @@ ${m3uUrl}
   //////////////
   // Channels //
   //////////////
-  channels.forEach(channel => {
+  channels.forEach((channel) => {
     if (channel.isStitched) {
       tv.push({
         name: 'channel',
@@ -128,15 +127,15 @@ ${m3uUrl}
           { name: 'display-name', text: channel.name },
           { name: 'display-name', text: channel.number },
           { name: 'desc', text: channel.summary },
-          { name: 'icon', attrs: { src: channel.solidLogoPNG.path } }
-        ]
+          { name: 'icon', attrs: { src: channel.solidLogoPNG.path } },
+        ],
       });
 
       //////////////
       // Episodes //
       //////////////
       if (channel.timelines) {
-        channel.timelines.forEach(programme => {
+        channel.timelines.forEach((programme) => {
           console.log(
             '[INFO] Adding instance of ' +
               programme.title +
@@ -150,7 +149,7 @@ ${m3uUrl}
             attrs: {
               start: moment(programme.start).format('YYYYMMDDHHmmss ZZ'),
               stop: moment(programme.stop).format('YYYYMMDDHHmmss ZZ'),
-              channel: channel.slug
+              channel: channel.slug,
             },
             children: [
               { name: 'title', attrs: { lang: 'en' }, text: programme.title },
@@ -160,33 +159,33 @@ ${m3uUrl}
                 text:
                   programme.title == programme.episode.name
                     ? ''
-                    : programme.episode.name
+                    : programme.episode.name,
               },
               {
                 name: 'desc',
                 attrs: { lang: 'en' },
-                text: programme.episode.description
+                text: programme.episode.description,
               },
               {
                 name: 'date',
-                text: moment(programme.episode.firstAired).format('YYYYMMDD')
+                text: moment(programme.episode.firstAired).format('YYYYMMDD'),
               },
               {
                 name: 'category',
                 attrs: { lang: 'en' },
-                text: programme.episode.genre
+                text: programme.episode.genre,
               },
               {
                 name: 'category',
                 attrs: { lang: 'en' },
-                text: programme.episode.subGenre
+                text: programme.episode.subGenre,
               },
               {
                 name: 'episode-num',
                 attrs: { system: 'onscreen' },
-                text: programme.episode.number
-              }
-            ]
+                text: programme.episode.number,
+              },
+            ],
           });
         });
       }
@@ -197,7 +196,7 @@ ${m3uUrl}
     { tv },
     {
       prettyPrint: true,
-      escape: true
+      escape: true,
     }
   );
 
