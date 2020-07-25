@@ -37,7 +37,7 @@ With no arguments, the following files will be created in the same directory as 
 </pre>
 #### --debugmode
 
-Debug mode will ignore all directory options and create the subdirectory ./pluto_debug/ next to the script. The M3U and XML files will not be generated, but instead added straight into the log.
+Debug mode will ignore all directory options and create the subdirectory ./pluto_debug/ next to the script. The M3U and XML files will not be generated, but instead added straight into the log. The log and cache files will be saved into ./pluto_debug/.
 
 #### --dir, --cache, --epg, --log
 
