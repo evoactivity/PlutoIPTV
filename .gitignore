@@ -1,5 +1,0 @@
-node_modules/*
-cache.json
-playlist.m3u8
-epg.xml
-proxy/index.js
