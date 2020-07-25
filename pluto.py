@@ -23,9 +23,9 @@ from decimal import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--debugmode', default=False, action='store_true', help="Debug mode")
-parser.add_argument('-m', '--dir', dest='localdir', help="M3U directory")
-parser.add_argument('-c', '--cache', dest='cachedir', help="Cache directory")
-parser.add_argument('-e', '--epg', dest='epgdir', help="EPG directory")
+parser.add_argument('-m', '--dir', dest='localdir', help="Path to M3U directory")
+parser.add_argument('-c', '--cache', dest='cachedir', help="Path to cache directory")
+parser.add_argument('-e', '--epg', dest='epgdir', help="Path to EPG directory")
 parser.add_argument('-l', '--log', dest='logdir', help="Path to log directory")
 parser.add_argument('-t', '--time', dest='epghours', help="Number of EPG Hours to collect")
 parser.add_argument('-x', '--longitude', dest='xlong', default=0, help="Longitude in decimal format")
