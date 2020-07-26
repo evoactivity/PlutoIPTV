@@ -308,12 +308,13 @@ def main():
 				stoptime = datetime.fromisoformat(epstop[:-1])
 				tstop = localtimezone.localize(stoptime)
 				localstop = tstart.strftime("%Y%m%d%H%M%S %z")
+				idslug = channel['slug'] + ".plutotv"
 
 				logging.info('Adding instance of ' + eptitle + ' to channel ' + channel['name'] + '.')
 
 				eptime = duration / 1000 / 60
 
-				xmlepisode = lmntree.SubElement(xml, "programme", channel=channel['slug'], start=localstart, stop=localstop)
+				xmlepisode = lmntree.SubElement(xml, "programme", channel=idslug, start=localstart, stop=localstop)
 				lmntree.SubElement(xmlepisode, "title", lang='en').text = epshow
 				if eptitle:
 					lmntree.SubElement(xmlepisode, "sub-title", lang='en').text = eptitle
