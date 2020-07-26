@@ -218,8 +218,10 @@ def main():
 			# M3U8 Playlist 
 
 			if channel['isStitched'] == True:
-				deviceid = uuid.uuid1()
-				sid = uuid.uuid4()
+				deviceid = channel['_id']
+				# deviceid = uuid.uuid1()
+				# sid = uuid.uuid4()
+				sid = channel['number']
 				baseurl = furl(channel['stitched']['urls'][0]['url']).remove(args=True, fragment=True).url
 
 				if not str(xlong) and not str(ylat):
