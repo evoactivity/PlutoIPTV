@@ -261,7 +261,7 @@ def main():
 				group = channel['category']
 				chname = channel['name']
 
-				m3uoutput = "\n#EXTINF:-1 tvg-name=\"" + chnumber + "\" tvg-id=\"" + slug + ".plutotv\" tvg-logo=\"" + logo + "\" group-title=\"" + group + "\"," + chname + "\n" + m3uurl + "\n"
+				m3uoutput = "\n#EXTINF:-1 tvg-name=\"" + chname + "\" tvg-id=\"" + chnumber + ".plutotv\" tvg-logo=\"" + logo + "\" group-title=\"" + group + "\"," + chname + "\n" + m3uurl + "\n"
 								
 				logging.info('Adding ' + chname + ' channel.')
 				
