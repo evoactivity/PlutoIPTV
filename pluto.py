@@ -219,11 +219,11 @@ def main():
 
 			if channel['isStitched'] == True:
 				deviceid = channel['_id']
+				chnumber = str(channel['number'])
 				# deviceid = uuid.uuid1()
 				# sid = uuid.uuid4()
-				sid = channel['number']
+				sid = chnumber
 				baseurl = furl(channel['stitched']['urls'][0]['url']).remove(args=True, fragment=True).url
-
 				if not str(xlong) and not str(ylat):
 					l = furl(channel['stitched']['urls'][0]['url'])
 					xnewlong = l.args['deviceLat']
@@ -235,7 +235,7 @@ def main():
 				mydict = { 
 					'advertisingId': '',
 					'appName': 'web',
-					'appVersion': 'unknown',
+					'appVersion': 'DNT',
 					'appStoreUrl': '',
 					'architecture': '',
 					'buildVersion': '',
@@ -247,20 +247,21 @@ def main():
 					'deviceMake': 'Chrome',
 					'deviceModel': 'web',
 					'deviceType': 'web',
-					'deviceVersion': 'unknown',
+					'deviceVersion': 'DNT',
 					'includeExtendedEvents': 'false',
 					'sid': sid,
 					'userId': '',
-					'serverSideAds': 'true'
+					'serverSideAds': 'true',
+					'terminate': 'false',
+					'marketingRegion': 'US'
 				}
-					
 				m3uurl = baseurl + "?" + urlencode(mydict)
 				slug = channel['slug']
 				logo = channel['solidLogoPNG']['path']
 				group = channel['category']
 				chname = channel['name']
 
-				m3uoutput = "\n#EXTINF:-1 tvg-name=\"" + chname + "\" tvg-id=\"" + slug + ".plutotv\" tvg-logo=\"" + logo + "\" group-title=\"" + group + "\"," + chname + "\n" + m3uurl + "\n"
+				m3uoutput = "\n#EXTINF:-1 tvg-name=\"" + chnumber + "\" tvg-id=\"" + slug + ".plutotv\" tvg-logo=\"" + logo + "\" group-title=\"" + group + "\"," + chname + "\n" + m3uurl + "\n"
 								
 				logging.info('Adding ' + chname + ' channel.')
 				
@@ -273,7 +274,7 @@ def main():
 			
 			# XMLTV EPG
 			
-			tvgidslug = channel['slug'] + ".plutotv"
+			tvgidslug = str(channel['number']) + ".plutotv"
 			xmlchannel = lmntree.SubElement (xml, "channel", id=tvgidslug)
 			lmntree.SubElement(xmlchannel, "display-name").text = channel['name']
 			lmntree.SubElement(xmlchannel, "icon",src=channel['solidLogoPNG']['path'])
@@ -314,7 +315,7 @@ def main():
 
 				eptime = duration / 1000 / 60
 
-				xmlepisode = lmntree.SubElement(xml, "programme", channel=idslug, start=localstart, stop=localstop)
+				xmlepisode = lmntree.SubElement(xml, "programme", channel=tvgidslug, start=localstart, stop=localstop)
 				lmntree.SubElement(xmlepisode, "title", lang='en').text = epshow
 				if eptitle:
 					lmntree.SubElement(xmlepisode, "sub-title", lang='en').text = eptitle
@@ -346,7 +347,16 @@ def main():
 
 		logging.info('Success! Wrote the M3U8 tuner to ' + m3u8path + "!")
 		xmltvtree = lmntree.ElementTree(xml)
-		xmldata = lmntree.tostring(xmltvtree, pretty_print=True, encoding="utf-8", xml_declaration=True, doctype='<!DOCTYPE tv SYSTEM "xmltv.dtd">')
+		
+		root = xmltvtree.getroot()
+
+		# sort the first layer
+		root[:] = sorted(root, key=lambda child: (child.tag,child.get('id'),child.get('channel')))
+
+
+
+		
+		xmldata = lmntree.tostring(root, pretty_print=True, encoding="utf-8", xml_declaration=True, doctype='<!DOCTYPE tv SYSTEM "xmltv.dtd">')
 		if not debugmode:
 			with open(epgpath, "wb") as f:
 				f.write(xmldata)
