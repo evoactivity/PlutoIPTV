@@ -17,16 +17,23 @@ from lxml import etree as lmntree
 import pytz
 from tzlocal import get_localzone
 import argparse
+import pathlib
 from decimal import *
 import re
+from wand.image import Image
+from wand.color import Color
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-d', '--debugmode', default=False, action='store_true', help="Debug mode")
-parser.add_argument('-m', '--dir', dest='localdir', help="Path to M3U directory")
+parser.add_argument('--debugmode', default=False, action='store_true', help="Debug mode")
+parser.add_argument('-d', '--dir', dest='localdir', help="Path to M3U directory")
 parser.add_argument('-c', '--cache', dest='cachedir', help="Path to cache directory")
 parser.add_argument('-e', '--epg', dest='epgdir', help="Path to EPG directory")
 parser.add_argument('-l', '--log', dest='logdir', help="Path to log directory")
+parser.add_argument('-i', '--picondir', dest='picondir', help="Path to picon cache directory")
+parser.add_argument('-f', '--color', '--colour', dest='hexcolour', default='transparent', help="Colour in hex #1E1E1E format for image background")
+parser.add_argument('-m', '--monopicon', dest='monopicon', default=False, action='store_true', help="Use monochrome (all-white) picon")
+parser.add_argument('-w', '--overwritepicons', dest='overwritepicons', default=False, action='store_true', help="Replace existing picons with newly downloaded versions")
 parser.add_argument('-t', '--time', dest='epghours', help="Number of EPG Hours to collect")
 parser.add_argument('-x', '--longitude', dest='xlong', default=0, help="Longitude in decimal format")
 parser.add_argument('-y', '--latitude', dest='ylat', default=0, help="Latitude in decimal format")
@@ -38,6 +45,10 @@ localdir = args.localdir
 cachedir = args.cachedir
 epgdir = args.epgdir
 logdir = args.logdir
+picondir = args.picondir
+hexcolour = args.hexcolour
+monopicon = args.monopicon
+overwritepicons = args.overwritepicons
 epghours = args.epghours
 xlong = str(args.xlong)
 ylat = str(args.ylat)
@@ -60,6 +71,8 @@ if not epgdir:
 	epgdir = localdir
 if not logdir:
 	logdir = localdir
+if not picondir.endswith("/"):
+	picondir = picondir + "/"
 
 if debugmode:
 	debugdir = os.path.dirname(os.path.realpath(__file__)) + "/plutotv_debug"
@@ -116,37 +129,79 @@ if debugmode:
 	debuglogpath = 'Log Path: ' + debugdir + "/"
 	logging.debug(debuglogpath)
 
-def exists(ipath):
+
+def exists(ipath,create=False):
 	fpath, fname = os.path.split(ipath)
 	try:
 		st = os.stat(fpath)
 		try:
 			stt = os.access(fpath, os.W_OK)
 		except:
-			logging.error("Write permissions on path " + fpath + " are incorrect.\nExiting.")
+			logging.error("Write permissions on path " + fpath + " are incorrect. Exiting.")
 			exit()
 	except os.error:
-		logging.error("Path " + fpath + " doesn't exist.\nExiting")
-		exit()
-
-	try:
-		if debugmode:
-			if is_file(ipath):
-				debugipath = ipath + " exists."
-				logging.debug(debugipath)	
-			
+		logging.warning("Path " + fpath + " doesn't exist. Creating")
+		try: 
+			srr = os.mkdir(fpath)
+		except:
+			logging.error("Can't create directory " + fpath)
+			return False
+	if fname:
+		if not fname.endswith('logoPNG.png'):
+			if debugmode:
+				if pathlib.Path.exists(ipath):
+					debugipath = ipath + " exists."
+					logging.debug(debugipath)	
 			else:
 				debugipath = ipath + " doesn't exist. It will be created."
-				logging.debug(debugipath)	
-		else:
-			open(ipath, 'x')
-	except FileExistsError:
-		fileexists = "File " + ipath + " doesn't yet exist. Creating."
-		logging.info(fileexists)
-		pass
-	
+				logging.debug(debugipath)
+				return True
+
+			if create:
+				fileexists = "File " + ipath + " doesn't yet exist. Creating."
+				logging.info(fileexists)
+				try:
+					temp = open(ipath,"w")
+					temp.close()
+					return True
+				except:
+					logging.error("Can't create file " + ipath)
+					exit()
 	return True
+
+def piconget(pid,monopicon,picondir,piconslug,hexcolour):
+	if exists(picondir):
+		urlbase = "http://images.pluto.tv/channels/"
+		if monopicon:
+			urlend = 'solidLogoPNG.png'
+		else:		
+			urlend = 'colorLogoPNG.png'
+	
+		geturl = urlbase + "/" + pid + "/" + urlend
+		savename = picondir + piconslug + ".png"
+		print(savename)
 		
+		if not exists(savename) or overwritepicons:
+			f = urllib.request.urlopen(geturl)
+			with Image(file=f) as img:
+				result = re.match("^(?:#)?[0-9a-fA-F]{3,6}$",str(hexcolour))
+				if result:
+					if not hexcolour.startswith("#"):
+						hexcolour = "#" + hexcolour
+					img.background_color = Color(hexcolour)
+				elif hexcolour == "transparent":
+					img.background_color = Color('transparent')
+				else:
+					logging.error("Background colour option must follow '#FFFFFF' hex format")
+					exit()
+				img.extent(width=576, height=576, x=0, y=-144)	
+				img.save(filename=savename)
+			f.close()
+	else:
+		try:
+			os.mkdir(picondir)
+		except os.error:
+			print ("Could not create " + picondir)
 def newcache(cachepath):
 	if os.path.isfile(cachepath):
 	
@@ -218,123 +273,141 @@ def main():
 			# M3U8 Playlist 
 
 			if channel['isStitched'] == True:
-				deviceid = channel['_id']
-				chnumber = str(channel['number'])
-				# deviceid = uuid.uuid1()
-				# sid = uuid.uuid4()
-				sid = chnumber
-				baseurl = furl(channel['stitched']['urls'][0]['url']).remove(args=True, fragment=True).url
-				if not str(xlong) and not str(ylat):
-					l = furl(channel['stitched']['urls'][0]['url'])
-					xnewlong = l.args['deviceLat']
-					ynewlat = l.args['deviceLon']
-				else:
-					xnewlong = str(xlong)
-					ynewlat = str(ylat)
-					
-				mydict = { 
-					'advertisingId': '',
-					'appName': 'web',
-					'appVersion': 'DNT',
-					'appStoreUrl': '',
-					'architecture': '',
-					'buildVersion': '',
-					'clientTime': '0',
-					'deviceDNT': '0',
-					'deviceId': deviceid,
-					'deviceLat': ynewlat,
-					'deviceLon': xnewlong,
-					'deviceMake': 'Chrome',
-					'deviceModel': 'web',
-					'deviceType': 'web',
-					'deviceVersion': 'DNT',
-					'includeExtendedEvents': 'false',
-					'sid': sid,
-					'userId': '',
-					'serverSideAds': 'true',
-					'terminate': 'false',
-					'marketingRegion': 'US'
-				}
-				m3uurl = baseurl + "?" + urlencode(mydict)
-				slug = channel['slug']
-				logo = channel['solidLogoPNG']['path']
-				group = channel['category']
-				chname = channel['name']
+				if not channel['name'] == 'Announcement':
+					deviceid = channel['_id']
+					chnumber = str(channel['number'])
+					# deviceid = uuid.uuid1()
+					# sid = uuid.uuid4()
+					sid = chnumber
+					baseurl = furl(channel['stitched']['urls'][0]['url']).remove(args=True, fragment=True).url
+					if not str(xlong) and not str(ylat):
+						l = furl(channel['stitched']['urls'][0]['url'])
+						xnewlong = l.args['deviceLat']
+						ynewlat = l.args['deviceLon']
+					else:
+						xnewlong = str(xlong)
+						ynewlat = str(ylat)
 				
-				m3uoutput = "\n#EXTINF:-1 tvg-name=\"" + chname + "\" tvg-id=\"" + deviceid + ".plutotv\" tvg-logo=\"" + logo + "\" group-title=\"" + group + "\"," + chname + "\n" + m3uurl + "\n"
-								
-				logging.info('Adding ' + chname + ' channel.')
-				
-				if not debugmode:
-					m3ufile.write(m3uoutput)
+					mydict = { 
+						'advertisingId': '',
+						'appName': 'web',
+						'appVersion': 'DNT',
+						'appStoreUrl': '',
+						'architecture': '',
+						'buildVersion': '',
+						'clientTime': '0',
+						'deviceDNT': '0',
+						'deviceId': deviceid,
+						'deviceLat': ynewlat,
+						'deviceLon': xnewlong,
+						'deviceMake': 'Chrome',
+						'deviceModel': 'web',
+						'deviceType': 'web',
+						'deviceVersion': 'DNT',
+						'includeExtendedEvents': 'false',
+						'sid': sid,
+						'userId': '',
+						'serverSideAds': 'true',
+						'terminate': 'false',
+						'marketingRegion': 'US'
+					}
+					m3uurl = baseurl + "?" + urlencode(mydict)
+					slug = channel['slug']
+					if monopicon:
+						logo = channel['solidLogoPNG']['path']
+					else:
+						logo = channel['colorLogoPNG']['path']
+					group = channel['category']
+					chname = channel['name']
+			
+					## image routine
+					if picondir:
+						piconslug = slug + ".plutotv"
+						logo = picondir + piconslug + ".png"
+						piconget(deviceid,monopicon,picondir,piconslug,hexcolour)
+
+					m3uoutput = "\n#EXTINF:-1 tvg-name=\"" + chname + "\" tvg-id=\"" + deviceid + ".plutotv\" tvg-logo=\"" + logo + "\" group-title=\"" + group + "\"," + chname + "\n" + m3uurl + "\n"
+							
+					logging.info('Adding ' + chname + ' channel.')
+			
+					if not debugmode:
+						m3ufile.write(m3uoutput)
+					else:
+						debugm3u += m3uoutput	
 				else:
-					debugm3u += m3uoutput	
-			else:
-				logging.info("Skipping 'fake' channel " + channel['name'] + '.')
-			
-			# XMLTV EPG
-			
-			tvgidslug = channel['_id'] + ".plutotv"
-			xmlchannel = lmntree.SubElement (xml, "channel", id=tvgidslug)
-			lmntree.SubElement(xmlchannel, "display-name").text = channel['name']
-			lmntree.SubElement(xmlchannel, "icon",src=channel['colorLogoPNG']['path'])
-			
-			for episodes in channel['timelines']:
+					logging.info("Skipping 'fake' channel " + channel['name'] + '.')
 		
-				categorylist = []
-				epdescription = episodes['episode']['description']
-				epdescription = epdescription.replace('\x92','')
-				if episodes['episode']['genre']:
-					categorylist.append(episodes['episode']['genre'])
-				if episodes['episode']['subGenre']:
-					categorylist.append(episodes['episode']['subGenre'])
-				if episodes['episode']['series']['type'] == "film":
-					categorylist.append("movie")
-				elif episodes['episode']['series']['type'] == "live":
-					categorylist.append('news')
-				else:
-					categorylist.append('series')
-				eppremiere = episodes['episode']['firstAired']
-				tpremiere = datetime.fromisoformat(eppremiere[:-1])
-				epdate = tpremiere.strftime("%Y%m%d")
-				epshow = episodes['episode']['name']
-				eprating = episodes['episode']['rating']
-				eptitle = episodes['title']
-				duration = episodes['episode']['duration']
-				epstart = episodes['start']
-				epstop = episodes['stop']
-				epnumber = episodes['episode']['number']
-				epicon = episodes['episode']['number']
-				starttime = datetime.fromisoformat(epstart[:-1])
-				tstart = localtimezone.localize(starttime)
-				localstart = tstart.strftime("%Y%m%d%H%M%S %z")
-				stoptime = datetime.fromisoformat(epstop[:-1])
-				tstop = localtimezone.localize(stoptime)
-				localstop = tstop.strftime("%Y%m%d%H%M%S %z")
-				idslug = channel['slug'] + ".plutotv"
-				if channel['category']  == "Latino":
-					eplang = "es"
-				else:
-					eplang = "en"
-				
-				logging.info('Adding instance of ' + eptitle + ' to channel ' + channel['name'] + '.')
+				# XMLTV EPG
+		
+				tvgidslug = channel['_id'] + ".plutotv"
+				xmlchannel = lmntree.SubElement (xml, "channel", id=tvgidslug)
+				lmntree.SubElement(xmlchannel, "display-name").text = channel['name']
 
-				eptime = duration / 1000 / 60
+				if picondir:
+					xmlicon = picondir + piconslug + ".png"
+				elif monopicon:
+					xmlicon = channel['solidLogoPNG']['path']		
+				else:
+					xmlicon = channel['colorLogoPNG']['path']
 
-				xmlepisode = lmntree.SubElement(xml, "programme", start=localstart, stop=localstop, channel=tvgidslug)
-				lmntree.SubElement(xmlepisode, "title", lang=eplang).text = epshow
-				if eptitle:
-					lmntree.SubElement(xmlepisode, "sub-title", lang=eplang).text = eptitle
-				lmntree.SubElement(xmlepisode, "desc", lang=eplang).text = epdescription
-				xmlcredits = lmntree.SubElement(xmlepisode, "credits")
-				lmntree.SubElement(xmlepisode, "date").text = epdate
-				for cat in categorylist:
-					lmntree.SubElement(xmlepisode, "category", lang=eplang).text = cat
-				lmntree.SubElement(xmlepisode, "length", units='minutes').text = str(eptime)
-				lmntree.SubElement(xmlepisode, "episode-num", system='onscreen').text = str(epnumber)
-				xmlrating = lmntree.SubElement(xmlepisode, "rating", system='US')
-				lmntree.SubElement(xmlrating, "value").text = eprating
-				
+				lmntree.SubElement(xmlchannel, "icon",src=xmlicon)
+		
+				for episodes in channel['timelines']:
+	
+					categorylist = []
+					epdescription = episodes['episode']['description']
+					epdescription = epdescription.replace('\x92','')
+					if episodes['episode']['genre']:
+						categorylist.append(episodes['episode']['genre'])
+					if episodes['episode']['subGenre']:
+						categorylist.append(episodes['episode']['subGenre'])
+					if episodes['episode']['series']['type'] == "film":
+						categorylist.append("movie")
+					elif episodes['episode']['series']['type'] == "live":
+						categorylist.append('news')
+					else:
+						categorylist.append('series')
+					eppremiere = episodes['episode']['firstAired']
+					tpremiere = datetime.fromisoformat(eppremiere[:-1])
+					epdate = tpremiere.strftime("%Y%m%d")
+					epshow = episodes['episode']['name']
+					eprating = episodes['episode']['rating']
+					eptitle = episodes['title']
+					duration = episodes['episode']['duration']
+					epstart = episodes['start']
+					epstop = episodes['stop']
+					epnumber = episodes['episode']['number']
+					epicon = episodes['episode']['number']
+					starttime = datetime.fromisoformat(epstart[:-1])
+					tstart = localtimezone.localize(starttime)
+					localstart = tstart.strftime("%Y%m%d%H%M%S %z")
+					stoptime = datetime.fromisoformat(epstop[:-1])
+					tstop = localtimezone.localize(stoptime)
+					localstop = tstop.strftime("%Y%m%d%H%M%S %z")
+					idslug = channel['slug'] + ".plutotv"
+					if channel['category']  == "Latino":
+						eplang = "es"
+					else:
+						eplang = "en"
+			
+					logging.info('Adding instance of ' + eptitle + ' to channel ' + channel['name'] + '.')
+
+					eptime = duration / 1000 / 60
+
+					xmlepisode = lmntree.SubElement(xml, "programme", start=localstart, stop=localstop, channel=tvgidslug)
+					lmntree.SubElement(xmlepisode, "title", lang=eplang).text = epshow
+					if eptitle:
+						lmntree.SubElement(xmlepisode, "sub-title", lang=eplang).text = eptitle
+					lmntree.SubElement(xmlepisode, "desc", lang=eplang).text = epdescription
+					xmlcredits = lmntree.SubElement(xmlepisode, "credits")
+					lmntree.SubElement(xmlepisode, "date").text = epdate
+					for cat in categorylist:
+						lmntree.SubElement(xmlepisode, "category", lang=eplang).text = cat
+					lmntree.SubElement(xmlepisode, "length", units='minutes').text = str(eptime)
+					lmntree.SubElement(xmlepisode, "episode-num", system='onscreen').text = str(epnumber)
+					xmlrating = lmntree.SubElement(xmlepisode, "rating", system='US')
+					lmntree.SubElement(xmlrating, "value").text = eprating
+			
 	
 		if not debugmode:
 			m3ufile.close()
