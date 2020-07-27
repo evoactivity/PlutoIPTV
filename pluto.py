@@ -18,7 +18,7 @@ import pytz
 from tzlocal import get_localzone
 import argparse
 from decimal import *
-
+import re
 
 
 parser = argparse.ArgumentParser()
@@ -260,8 +260,8 @@ def main():
 				logo = channel['solidLogoPNG']['path']
 				group = channel['category']
 				chname = channel['name']
-
-				m3uoutput = "\n#EXTINF:-1 tvg-name=\"" + chname + "\" tvg-id=\"" + chnumber + ".plutotv\" tvg-logo=\"" + logo + "\" group-title=\"" + group + "\"," + chname + "\n" + m3uurl + "\n"
+				
+				m3uoutput = "\n#EXTINF:-1 tvg-name=\"" + chname + "\" tvg-id=\"" + deviceid + ".plutotv\" tvg-logo=\"" + logo + "\" group-title=\"" + group + "\"," + chname + "\n" + m3uurl + "\n"
 								
 				logging.info('Adding ' + chname + ' channel.')
 				
@@ -274,15 +274,16 @@ def main():
 			
 			# XMLTV EPG
 			
-			tvgidslug = str(channel['number']) + ".plutotv"
+			tvgidslug = channel['_id'] + ".plutotv"
 			xmlchannel = lmntree.SubElement (xml, "channel", id=tvgidslug)
 			lmntree.SubElement(xmlchannel, "display-name").text = channel['name']
-			lmntree.SubElement(xmlchannel, "icon",src=channel['solidLogoPNG']['path'])
+			lmntree.SubElement(xmlchannel, "icon",src=channel['colorLogoPNG']['path'])
 			
 			for episodes in channel['timelines']:
 		
 				categorylist = []
 				epdescription = episodes['episode']['description']
+				epdescription = epdescription.replace('\x92','')
 				if episodes['episode']['genre']:
 					categorylist.append(episodes['episode']['genre'])
 				if episodes['episode']['subGenre']:
@@ -303,30 +304,37 @@ def main():
 				epstart = episodes['start']
 				epstop = episodes['stop']
 				epnumber = episodes['episode']['number']
+				epicon = episodes['episode']['number']
 				starttime = datetime.fromisoformat(epstart[:-1])
 				tstart = localtimezone.localize(starttime)
 				localstart = tstart.strftime("%Y%m%d%H%M%S %z")
 				stoptime = datetime.fromisoformat(epstop[:-1])
 				tstop = localtimezone.localize(stoptime)
-				localstop = tstart.strftime("%Y%m%d%H%M%S %z")
+				localstop = tstop.strftime("%Y%m%d%H%M%S %z")
 				idslug = channel['slug'] + ".plutotv"
-
+				if channel['category']  == "Latino":
+					eplang = "es"
+				else:
+					eplang = "en"
+				
 				logging.info('Adding instance of ' + eptitle + ' to channel ' + channel['name'] + '.')
 
 				eptime = duration / 1000 / 60
 
-				xmlepisode = lmntree.SubElement(xml, "programme", channel=tvgidslug, start=localstart, stop=localstop)
-				lmntree.SubElement(xmlepisode, "title", lang='en').text = epshow
+				xmlepisode = lmntree.SubElement(xml, "programme", start=localstart, stop=localstop, channel=tvgidslug)
+				lmntree.SubElement(xmlepisode, "title", lang=eplang).text = epshow
 				if eptitle:
-					lmntree.SubElement(xmlepisode, "sub-title", lang='en').text = eptitle
-				lmntree.SubElement(xmlepisode, "desc", lang='en').text = epdescription
-				lmntree.SubElement(xmlepisode, "length", units='minutes').text = str(eptime)
+					lmntree.SubElement(xmlepisode, "sub-title", lang=eplang).text = eptitle
+				lmntree.SubElement(xmlepisode, "desc", lang=eplang).text = epdescription
+				xmlcredits = lmntree.SubElement(xmlepisode, "credits")
+				lmntree.SubElement(xmlepisode, "date").text = epdate
 				for cat in categorylist:
-					lmntree.SubElement(xmlepisode, "category", lang='en').text = cat
+					lmntree.SubElement(xmlepisode, "category", lang=eplang).text = cat
+				lmntree.SubElement(xmlepisode, "length", units='minutes').text = str(eptime)
+				lmntree.SubElement(xmlepisode, "episode-num", system='onscreen').text = str(epnumber)
 				xmlrating = lmntree.SubElement(xmlepisode, "rating", system='US')
 				lmntree.SubElement(xmlrating, "value").text = eprating
-				lmntree.SubElement(xmlepisode, "date").text = epdate
-				lmntree.SubElement(xmlepisode, "ep-number", system='onscreen').text = str(epnumber)
+				
 	
 		if not debugmode:
 			m3ufile.close()
