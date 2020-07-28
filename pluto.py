@@ -120,10 +120,6 @@ def fileexists(cpath, create=True):
                 return False
     return True
 
-direxists(logdir)
-direxists(cachedir)
-direxists(epgdir)
-
 LEVEL = logging.INFO
 handlers = [logging.FileHandler(logpath, 'w'), logging.StreamHandler()]
 logging.basicConfig(level=LEVEL, format='[%(levelname)s]: %(message)s', handlers=handlers)
