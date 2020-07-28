@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.7
 # -*- coding: UTF-8 -*-
 """ A Script for setting up full TVHeadend support for Pluto.tv"""
 
@@ -82,7 +82,7 @@ if debugmode:
     localdir = debugdir
     epgdir = debugdir
     logdir = debugdir
-    LEVEL = logging.DEBUG
+    LEVEL = logging.debug
 
 cachepath = os.path.join(cachedir, CACHEFILE)
 m3u8path = os.path.join(localdir, M3U8FILE)
@@ -93,56 +93,46 @@ fourplaces = Decimal(10) ** -4
 XLONG = Decimal(XLONG).quantize(fourplaces)
 YLAT = Decimal(YLAT).quantize(fourplaces)
 
-def exists(ipath, create=False):
-    """ Checks if a folder or file exists and optionally
-        creates if missing """
-
-    fpath, fname = os.path.split(ipath)
-    try:
-        os.stat(fpath)
+def direxists(ipath):
+    """ Checks if a directory exists and creates if missing """
+    if not ipath.endswith("/"):
+        ipath = ipath + "/"
+    if not os.path.exists(ipath):
         try:
-            os.access(fpath, os.W_OK)
+            os.mkdir(ipath)
         except os.error:
-            logging.error("Write permissions on path %s are incorrect. Exiting.", fpath)
-            sys.exit()
-    except os.error:
-        logging.warning("Path %s doesn't exist. Creating.", fpath)
-        try:
-            os.mkdir(fpath)
-        except os.error:
-            logging.error("Can't create directory %s!", fpath)
+            logging.error("Can't create directory %s!", ipath)
+    else:
+        if not os.access(os.path.dirname(ipath), os.W_OK):
+            logging.error("Can't write to directory %s! Check permissions.", ipath)
             return False
-    if fname:
-        if not fname.endswith('logoPNG.png'):
-            if debugmode:
-                if pathlib.Path.exists(ipath):
-                    debugipath = ipath + " exists."
-                    logging.debug(debugipath)
-            else:
-                debugipath = ipath + " doesn't exist. It will be created."
-                logging.debug(debugipath)
-                return True
-
-            if create:
-                fileexists = "File " + ipath + " doesn't yet exist. Creating."
-                logging.info(fileexists)
-                try:
-                    temp = open(ipath, "w")
-                    temp.close()
-                    return True
-                except IOError:
-                    logging.error("Can't create file %s!", fpath)
-                    sys.exit()
     return True
 
-exists(cachedir, True)
-exists(epgdir, True)
-exists(logdir, True)
-exists(picondir, True)
+def fileexists(cpath, create=True):
+    """ Checks if a file exists and creates if missing """
+    dpath = os.path.dirname(cpath)
+    if not os.path.isfile(cpath):
+        if direxists(dpath) and create:
+            try:
+                pathlib.Path(cpath).touch()
+            except os.error:
+                logging.error("Can't create file %s!", cpath)
+                return False
+    return True
+
+direxists(logdir)
+direxists(cachedir)
+direxists(epgdir)
 
 LEVEL = logging.INFO
 handlers = [logging.FileHandler(logpath, 'w'), logging.StreamHandler()]
 logging.basicConfig(level=LEVEL, format='[%(levelname)s]: %(message)s', handlers=handlers)
+
+direxists(cachedir)
+direxists(epgdir)
+direxists(logdir)
+direxists(picondir)
+
 
 if debugmode:
     XYUSED = "Longitude used: " + str(XLONG) + ", Latitude used: " + str(YLAT)
@@ -182,7 +172,7 @@ if debugmode:
 def piconget(pid, mnpicon, picndir, piconslug, hxclr):
     """ Function for fetching and manipulating picons """
 
-    if exists(picndir):
+    if direxists(picndir):
         urlbase = "http://images.pluto.tv/channels/"
         if mnpicon:
             urlend = 'solidLogoPNG.png'
@@ -192,7 +182,7 @@ def piconget(pid, mnpicon, picndir, piconslug, hxclr):
         geturl = urlbase + "/" + pid + "/" + urlend
         savename = picndir + piconslug + ".png"
 
-        if not exists(savename) or overwritepicons:
+        if (not fileexists(savename, False)) or (overwritepicons):
             _f = urllib.request.urlopen(geturl)
             with Image(file=_f) as img:
                 result = re.match("^(?:#)?[0-9a-fA-F]{3,6}$", str(hxclr))
@@ -216,18 +206,12 @@ def piconget(pid, mnpicon, picndir, piconslug, hxclr):
 
 def newcache(cchepath):
     """ Checks how old the cache is """
-
-    try:
-        os.path.isfile(cchepath)
     # it's under 30 mins old and not an empty file
-        now = time.time()
-        mtime = os.path.getmtime(cchepath)
-        if now - mtime <= 1800:
-            return False
-        return True
-    except IOError:
-        logging.error("There was an issue fetching the cache.")
-        sys.exit()
+    now = time.time()
+    mtime = os.path.getmtime(cchepath)
+    if now - mtime <= 1800:
+        return False
+    return True
 
 
 def getnewdata():
@@ -267,17 +251,20 @@ def datetime_from_utc_to_local(utc_datetime):
 def main():
     """ the big show """
     logging.info('Grabbing EPG...')
-
-    if not newcache(cachepath):
-        logging.info("Using %s, it's under 30 minutes old.", cachepath)
+    if os.path.exists(cachepath):
+        if not newcache(cachepath):
+            logging.info("Using %s, it's under 30 minutes old.", cachepath)
+        else:
+            getnewdata()
     else:
         getnewdata()
 
-    with open(cachepath) as _f:
+    with open(cachepath, encoding='utf-8') as _f:
         data = json.load(_f)
         if not debugmode:
-            m3ufile = open(m3u8path, 'w')
-            m3ufile.write("#EXTM3U\n")
+            if direxists(localdir):
+                m3ufile = open(m3u8path, 'w')
+                m3ufile.write("#EXTM3U\n")
         else:
             debugm3u = "#EXTM3U\n"
 
@@ -343,7 +330,7 @@ def main():
                     ## image routine
                     if picondir:
                         piconslug = slug + ".plutotv"
-                        logo = picondir + piconslug + ".png"
+                        logo = "file://" + picondir + piconslug + ".png"
                         piconget(deviceid, monopicon, picondir, piconslug, hexcolour)
 
                     m3uoutput = ("\n#EXTINF:-1 tvg-name=\"" + chname + "\" tvg-id=\"" +
@@ -367,7 +354,7 @@ def main():
                 lmntree.SubElement(xmlchannel, "display-name").text = channel['name']
 
                 if picondir:
-                    xmlicon = picondir + piconslug + ".png"
+                    xmlicon = "file://" + picondir + piconslug + ".png"
                 elif monopicon:
                     xmlicon = channel['solidLogoPNG']['path']
                 else:
@@ -463,10 +450,10 @@ def main():
                                    xml_declaration=True,
                                    doctype='<!DOCTYPE tv SYSTEM "xmltv.dtd">')
         if not debugmode:
-            with open(epgpath, "wb") as _f:
-                _f.write(xmldata)
-                _f.close()
-                logging.info("Success! Wrote the EPG to %s!", m3u8path)
+            with open(epgpath, "wb") as fxml:
+                fxml.write(xmldata)
+                fxml.close()
+                logging.info("Success! Wrote the EPG to %s!", epgpath)
         else:
             logging.debug(" ")
             logging.debug("================")
