@@ -20,12 +20,6 @@ With no arguments, the following files will be created in the same directory as 
 <pre>
   -h, --help            show this help message and exit
   --debugmode           Debug mode
-  -t EPGHOURS, --time EPGHOURS
-                        Number of EPG Hours to collect
-  -x XLONG, --longitude XLONG
-                        Longitude in decimal format
-  -y YLAT, --latitude YLAT
-                        Latitude in decimal format
   -d LOCALDIR, --dir LOCALDIR
                         Path to M3U directory
   -c CACHEDIR, --cache CACHEDIR
@@ -36,11 +30,26 @@ With no arguments, the following files will be created in the same directory as 
                         Path to log directory
   -i PICONDIR, --picondir PICONDIR
                         Path to picon cache directory
-  -f HEXCOLOUR, --colour HEXCOLOUR
-                        Colour in hex #1E1E1E format for image background
+  -f HEXCOLOUR1, --bgcolour1 HEXCOLOUR1
+                        Colour #1 in hex #1E1E1E format for image background
+  -g HEXCOLOUR2, --bgcolour2 HEXCOLOUR2
+                        Colour #2 in hex #1E1E1E format for image background
+  -a ANGLE, --angle ANGLE
+                        Angle for image background gradient in degrees, eg;
+                        '270'
   -m, --monopicon       Use monochrome (all-white) picon
+  -z, --colourful       Solid white icon over auto-generated dark gradient
+                        backgrounds
+  -b, --bright          Does the same as --colourful, but makes the background
+                        gradient two-coloue and ultra-intense.
   -w, --overwritepicons
                         Replace existing picons with newly downloaded versions
+  -t EPGHOURS, --time EPGHOURS
+                        Number of EPG Hours to collect
+  -x XLONG, --longitude XLONG
+                        Longitude in decimal format
+  -y YLAT, --latitude YLAT
+                        Latitude in decimal format
 </pre>
 #### --debugmode (optional)
 
@@ -60,11 +69,27 @@ Pretty self-explanatory — Where you want the individual files to go. The defau
 
 #### --picondir (optional)
 
-A location to store channel logos as "picons". Logo images will be pulled from the pluto.tv site, expanded into a square picon (no cropping takes place, only expansion of the canvas), and saved with a channel-identifiable filename in the directory submitted.
+A location to store channel logos as "picons". Logo images will be pulled from the pluto.tv site, expanded into a square picon (no cropping takes place, only expansion of the canvas), and saved with a channel-identifiable filename in the directory submitted. If not used with --bgcolour, --colourful or --bright, the image background remains transparent.
 
-#### --colour (optional)
+#### --bgcolour1 (optional)
 
-A hexidecimal RGB value (#1F1F1F) to use as a background colour to flatten transparent pngs.
+A hexidecimal RGB value (#1F1F1F) to be used as background colour in picons. If used with --bgcolour2, --colourful or --bright, becomes the first colour of a gradient, otherwise used to as a solid background colour. 
+
+#### --bgcolour2 (optional)
+
+A hexidecimal RGB value (#1F1F1F) to be used as the secondary colour in background gradients. Only used in conjunction with. --bgcolour1.
+
+#### --angle (optional)
+
+If used with --colourful, --bright or combined --bgcolour1 and bgcolour2, defines the angle used for the background gradient. Defaults to "random".
+
+#### --colourful (optional)
+
+A bit misleading a name, but creates a muted gradient background for the picons. Colours and are generated using the hex ID string of the channel. The angle of the gradient can be set using --angle, but can also be left to default (generated using the hex ID string of the channel).
+
+#### --bright (optional)
+
+Creates an intensely colourful background gradient for the picons. Same idea as --colourful, but looks best with --monopicon.
 
 #### --monopicon (optional)
 
