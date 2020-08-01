@@ -31,17 +31,22 @@ parser.add_argument('-c', '--cache', dest='cachedir', help="Path to cache direct
 parser.add_argument('-e', '--epg', dest='epgdir', help="Path to EPG directory")
 parser.add_argument('-l', '--log', dest='logdir', help="Path to log directory")
 parser.add_argument('-i', '--picondir', dest='picondir', help="Path to picon cache directory")
-parser.add_argument('-f', '--bgcolour', dest='hexcolour', default='transparent',
-                    help="Colour in hex #1E1E1E format for image background")
+parser.add_argument('-f', '--bgcolour1', dest='hexcolour1', default=None,
+                    help="Colour #1 in hex #1E1E1E format for image background")
+parser.add_argument('-g', '--bgcolour2', dest='hexcolour2', default=None,
+                    help="Colour #2 in hex #1E1E1E format for image background")
+parser.add_argument('-a', '--angle', dest='angle', default=None,
+                    help="Angle for image background gradient in degrees, " +
+                    " eg; '270'")
 parser.add_argument('-m', '--monopicon', dest='monopicon', default=False,
                     action='store_true', help="Use monochrome (all-white) picon")
 parser.add_argument('-z', '--colourful', dest='colourful',
                     default=False, action='store_true',
-                    help="solid icon over auto-generated dark gradient backgrounds")
+                    help="Solid white icon over auto-generated dark gradient backgrounds")
 parser.add_argument('-b', '--bright', dest='bright',
                     default=False, action='store_true',
-                    help="Only works with --colourful. Makes the " +
-                    "background gradient ultra-intense.")
+                    help="Does the same as --colourful, but makes the " +
+                    "background gradient two-coloue and ultra-intense.")
 parser.add_argument('-w', '--overwritepicons', dest='overwritepicons',
                     default=False, action='store_true',
                     help="Replace existing picons with newly downloaded versions")
@@ -60,7 +65,9 @@ cachedir = args.cachedir
 epgdir = args.epgdir
 logdir = args.logdir
 picondir = args.picondir
-hexcolour = args.hexcolour
+hexcolour1 = args.hexcolour1
+hexcolour2 = args.hexcolour2
+angle = args.angle
 monopicon = args.monopicon
 overwritepicons = args.overwritepicons
 COLOURFUL = args.colourful
@@ -75,9 +82,29 @@ LOGFILE = "plutotv.log"
 DEFAULTEPGHOURS = 8
 MAXEPGHOURS = 10
 
-if COLOURFUL and hexcolour != 'transparent':
-    logging.error("Options --colourful and --colour cannot be used together.")
-    sys.exit()
+if hexcolour1 is not None:
+    result1 = re.match("^(?:#)?[0-9a-fA-F]{3,6}$", str(hexcolour1))
+    if not result1:
+        logging.error("Background Colour #1 must match '#FFFFFF' hex format")
+        sys.exit()
+    if not hexcolour1.startswith("#"):
+        hexcolour1 = "#" + str(hexcolour1)
+
+if hexcolour2 is not None:
+    result2 = re.match("^(?:#)?[0-9a-fA-F]{3,6}$", str(hexcolour2))
+    if not result2:
+        logging.error("Background Colour #2 must match '#FFFFFF' hex format")
+        sys.exit()
+    if not hexcolour2.startswith("#"):
+        hexcolour2 = "#" + str(hexcolour2)
+
+if angle:
+    result1 = re.match("^[0-9]{1,3}$", str(angle))
+    if not result1:
+        logging.error("Angle must be a only a number between 0-360")
+        sys.exit()
+    if not hexcolour1 and not COLOURFUL and not CBRIGHT:
+        print('Angle does nothing if the arguments create a transparent background')
 
 if not localdir:
     localdir = os.path.dirname(os.path.realpath(__file__))
@@ -554,7 +581,7 @@ def hextoangle(hexc):
     anglevalue = round(anglevalue)
     return anglevalue
 
-def piconget(pid, mnpicon, picndir, piconslug, hxclr, colrful=False, brite=False):
+def piconget(pid, mnpicon, picndir, piconslug, hxclr1, hxclr2, mangle=None, colrful=False, brite=False):
     """ Function for fetching and manipulating picons """
 
     if direxists(picndir):
@@ -570,25 +597,43 @@ def piconget(pid, mnpicon, picndir, piconslug, hxclr, colrful=False, brite=False
         if (not fileexists(savename, False)) or (overwritepicons):
             _f = urllib.request.urlopen(geturl)
 
-            if colrful or brite:
-                hex1 = pid[-2:]
-                angle1 = hextoangle(hex1)
-                if angle1 - 60 <= 0:
-                    angle2 = angle1 + 300
+            if colrful or brite or hxclr1:
+
+                if colrful or brite:
+                    hex1 = pid[-2:]
+                    angle1 = hextoangle(hex1)
+                    if angle1 - 60 <= 0:
+                        angle2 = angle1 + 300
+                    else:
+                        angle2 = angle1 - 60
                 else:
-                    angle2 = angle1 - 60
+                    hxclr2 = hxclr1
 
                 with Image() as canvas:
                     library.MagickSetSize(canvas.wand, 576, 576)
                     if CBRIGHT:
                         brpc = '100%'
+                        sat = '100%'
                     else:
-                        brpc = '20%'
+                        brpc = '30%'
+                        sat = '50%'
+
+                    if hxclr2 is not None:
+                        grad = "gradient:" + hxclr1 + "-" + hxclr2
+                        print ("Fuck!")
+                    elif hxclr1 and angle1:
+                        grad = "gradient:" +  hxclr1 + "-hsb(" + str(angle1) + \
+                               ", 100%, " + str(brpc) + ")"
+                    else:
+                        grad = "gradient:hsb(" + str(angle1) + ", " + sat + ", " + \
+                               str(brpc) + ")" + "-hsb(" + str(angle2) + ", " + sat + \
+                               ", " + str(brpc) + ")"
+                    if mangle:
+                        angle1 = mangle
+
 
                     canvas.options['gradient:angle'] = str(angle1)
-                    canvas.pseudo(576, 576, "gradient:hsb(" + str(angle1) + ", 100%, " +
-                                  str(brpc) + ")" + "-hsb(" + str(angle2) + ", 100%, " +
-                                  str(brpc) + ")")
+                    canvas.pseudo(576, 576, grad)
 
                     with Image(file=_f) as img:
 
@@ -598,21 +643,11 @@ def piconget(pid, mnpicon, picndir, piconslug, hxclr, colrful=False, brite=False
                         img.save(filename=savename)
 
             else:
-                result = re.match("^(?:#)?[0-9a-fA-F]{3,6}$", str(hxclr))
-                with Image(file=_f) as img:
-                    if result:
-                        if not hxclr.startswith("#"):
-                            hxclr = "#" + hxclr
-                        img.background_color = Color(hxclr)
-                    elif hxclr == "transparent":
-                        img.background_color = Color('transparent')
-                    else:
-                        logging.error("Background colour must match '#FFFFFF' hex format")
-                        sys.exit()
+                 with Image(file=_f) as img:
+                     img.background_color = Color('transparent')
+                     img.extent(width=576, height=576, x=0, y=-144)
+                     img.save(filename=savename)
 
-                    img.extent(width=576, height=576, x=0, y=-144)
-                    img.save(filename=savename)
-       #     img.save(filename=savename)
             _f.close()
     else:
         try:
@@ -749,7 +784,7 @@ def main():
                         piconslug = slug + ".plutotv"
                         logo = "file://" + picondir + piconslug + ".png"
                         piconget(deviceid, monopicon, picondir, piconslug,
-                                 hexcolour, COLOURFUL, CBRIGHT)
+                                 hexcolour1, hexcolour2, angle, COLOURFUL, CBRIGHT)
 
                     m3uoutput = ("\n#EXTINF:-1 tvg-name=\"" + chname + "\" tvg-id=\"" +
                                  deviceid + ".plutotv\" " + "tvg-logo=\"" + logo +
