@@ -65,8 +65,8 @@ cachedir = args.cachedir
 epgdir = args.epgdir
 logdir = args.logdir
 picondir = args.picondir
-hexcolour1 = args.hexcolour1
-hexcolour2 = args.hexcolour2
+HEXCOLOUR1 = args.hexcolour1
+HEXCOLOUR2 = args.hexcolour2
 angle = args.angle
 monopicon = args.monopicon
 overwritepicons = args.overwritepicons
@@ -82,28 +82,28 @@ LOGFILE = "plutotv.log"
 DEFAULTEPGHOURS = 8
 MAXEPGHOURS = 10
 
-if hexcolour1 is not None:
-    result1 = re.match("^(?:#)?[0-9a-fA-F]{3,6}$", str(hexcolour1))
+if HEXCOLOUR1 is not None:
+    result1 = re.match("^(?:#)?[0-9a-fA-F]{3,6}$", str(HEXCOLOUR1))
     if not result1:
         logging.error("Background Colour #1 must match '#FFFFFF' hex format")
         sys.exit()
-    if not hexcolour1.startswith("#"):
-        hexcolour1 = "#" + str(hexcolour1)
+    if not HEXCOLOUR1.startswith("#"):
+        HEXCOLOUR1 = "#" + str(HEXCOLOUR1)
 
-if hexcolour2 is not None:
-    result2 = re.match("^(?:#)?[0-9a-fA-F]{3,6}$", str(hexcolour2))
+if HEXCOLOUR2 is not None:
+    result2 = re.match("^(?:#)?[0-9a-fA-F]{3,6}$", str(HEXCOLOUR2))
     if not result2:
         logging.error("Background Colour #2 must match '#FFFFFF' hex format")
         sys.exit()
-    if not hexcolour2.startswith("#"):
-        hexcolour2 = "#" + str(hexcolour2)
+    if not HEXCOLOUR2.startswith("#"):
+        HEXCOLOUR2 = "#" + str(HEXCOLOUR2)
 
 if angle:
     result1 = re.match("^[0-9]{1,3}$", str(angle))
     if not result1:
         logging.error("Angle must be a only a number between 0-360")
         sys.exit()
-    if not hexcolour1 and not COLOURFUL and not CBRIGHT:
+    if not HEXCOLOUR1 and not COLOURFUL and not CBRIGHT:
         print('Angle does nothing if the arguments create a transparent background')
 
 if not localdir:
@@ -581,7 +581,8 @@ def hextoangle(hexc):
     anglevalue = round(anglevalue)
     return anglevalue
 
-def piconget(pid, mnpicon, picndir, piconslug, hxclr1, hxclr2, mangle=None, colrful=False, brite=False):
+def piconget(pid, mnpicon, picndir, piconslug, hxclr1, hxclr2, mangle=None,
+             colrful=False, brite=False):
     """ Function for fetching and manipulating picons """
 
     if direxists(picndir):
@@ -620,7 +621,6 @@ def piconget(pid, mnpicon, picndir, piconslug, hxclr1, hxclr2, mangle=None, colr
 
                     if hxclr2 is not None:
                         grad = "gradient:" + hxclr1 + "-" + hxclr2
-                        print ("Fuck!")
                     elif hxclr1 and angle1:
                         grad = "gradient:" +  hxclr1 + "-hsb(" + str(angle1) + \
                                ", 100%, " + str(brpc) + ")"
@@ -643,10 +643,10 @@ def piconget(pid, mnpicon, picndir, piconslug, hxclr1, hxclr2, mangle=None, colr
                         img.save(filename=savename)
 
             else:
-                 with Image(file=_f) as img:
-                     img.background_color = Color('transparent')
-                     img.extent(width=576, height=576, x=0, y=-144)
-                     img.save(filename=savename)
+                with Image(file=_f) as img:
+                    img.background_color = Color('transparent')
+                    img.extent(width=576, height=576, x=0, y=-144)
+                    img.save(filename=savename)
 
             _f.close()
     else:
@@ -784,7 +784,7 @@ def main():
                         piconslug = slug + ".plutotv"
                         logo = "file://" + picondir + piconslug + ".png"
                         piconget(deviceid, monopicon, picondir, piconslug,
-                                 hexcolour1, hexcolour2, angle, COLOURFUL, CBRIGHT)
+                                 HEXCOLOUR1, HEXCOLOUR2, angle, COLOURFUL, CBRIGHT)
 
                     m3uoutput = ("\n#EXTINF:-1 tvg-name=\"" + chname + "\" tvg-id=\"" +
                                  deviceid + ".plutotv\" " + "tvg-logo=\"" + logo +
