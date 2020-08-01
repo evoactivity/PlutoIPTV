@@ -22,6 +22,7 @@ from furl import furl
 from lxml import etree as lmntree
 from wand.image import Image
 from wand.color import Color
+from wand.api import library
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--debugmode', default=False, action='store_true', help="Debug mode")
@@ -30,10 +31,17 @@ parser.add_argument('-c', '--cache', dest='cachedir', help="Path to cache direct
 parser.add_argument('-e', '--epg', dest='epgdir', help="Path to EPG directory")
 parser.add_argument('-l', '--log', dest='logdir', help="Path to log directory")
 parser.add_argument('-i', '--picondir', dest='picondir', help="Path to picon cache directory")
-parser.add_argument('-f', '--colour', dest='hexcolour', default='transparent',
+parser.add_argument('-f', '--bgcolour', dest='hexcolour', default='transparent',
                     help="Colour in hex #1E1E1E format for image background")
-parser.add_argument('-m', '--monopicon', dest='monopicon', default=False, action='store_true',
-                    help="Use monochrome (all-white) picon")
+parser.add_argument('-m', '--monopicon', dest='monopicon', default=False,
+                    action='store_true', help="Use monochrome (all-white) picon")
+parser.add_argument('-z', '--colourful', dest='colourful',
+                    default=False, action='store_true',
+                    help="solid icon over auto-generated dark gradient backgrounds")
+parser.add_argument('-b', '--bright', dest='bright',
+                    default=False, action='store_true',
+                    help="Only works with --colourful. Makes the " +
+                    "background gradient ultra-intense.")
 parser.add_argument('-w', '--overwritepicons', dest='overwritepicons',
                     default=False, action='store_true',
                     help="Replace existing picons with newly downloaded versions")
@@ -55,6 +63,8 @@ picondir = args.picondir
 hexcolour = args.hexcolour
 monopicon = args.monopicon
 overwritepicons = args.overwritepicons
+COLOURFUL = args.colourful
+CBRIGHT = args.bright
 EPGHOURS = args.epghours
 XLONG = str(args.xlong)
 YLAT = str(args.ylat)
@@ -64,6 +74,10 @@ EPGFILE = "plutotvepg.xml"
 LOGFILE = "plutotv.log"
 DEFAULTEPGHOURS = 8
 MAXEPGHOURS = 10
+
+if COLOURFUL and hexcolour != 'transparent':
+    logging.error("Options --colourful and --colour cannot be used together.")
+    sys.exit()
 
 if not localdir:
     localdir = os.path.dirname(os.path.realpath(__file__))
@@ -152,8 +166,6 @@ else:
 if debugmode:
     HOURSUSED = 'Episode Hours supplied: ' + str(EPGHOURS)
     logging.debug(HOURSUSED)
-
-if debugmode:
     if not os.path.isdir(debugdir):
         os.mkdir(debugdir)
     debugcachepath = "Cache Path: " + debugdir + "/" + CACHEFILE
@@ -165,7 +177,384 @@ if debugmode:
     debuglogpath = 'Log Path: ' + debugdir + "/"
     logging.debug(debuglogpath)
 
-def piconget(pid, mnpicon, picndir, piconslug, hxclr):
+def tvhcategory(xtype, category, subgenre):
+    ''' Creates category list using an XMLTV and TVH friendly category dictionary. '''
+    xtype = xtype.strip()
+    category = category.strip()
+    subgenre = subgenre.strip()
+
+    catlist = []
+
+    if category == 'News + Opinion':
+        catlist.append('News')
+    elif category == 'Film':
+        catlist.append('Movie')
+    elif category == 'TV':
+        catlist.append('Series')
+        catlist.append('TVShow')
+    elif category == 'Music':
+        catlist.append('Music')
+    elif category in ['Life + Style', 'Explore', 'Entertainment']:
+        if xtype == 'film':
+            catlist.append('Movie')
+        else:
+            catlist.append('Series')
+    else:
+        catlist.append('Series')
+
+    if subgenre == 'Hobbies & Games':
+        if category == 'Tech & Geek':
+            catlist.append('Gaming')
+            catlist.append('Technology')
+            catlist.append('Computers')
+        else:
+            catlist.append('Game Show / Quiz / Contest')
+            catlist.append('Game Show')
+
+    moviedict = {
+        'Action Classics': 'Movie / Drama',
+        'Action Sci-Fi & Fantasy': 'Science Fiction / Fantasy / Horror',
+        'Action Thrillers': 'Detective / Thriller',
+        'Adventures': 'Adventure / Western / War',
+        'African-American Action': 'Movie / Drama',
+        'African-American Comedies': 'Comedy',
+        'African-American Romance': 'Romance',
+        'Ages 2-4': 'Movie / Drama',
+        'Alien Sci-Fi': 'Science Fiction / Fantasy / Horror',
+        'Animal Tales': 'Soap / Melodrama / Folkloric',
+        'Animals': 'Soap / Melodrama / Folkloric',
+        'Anime Action & Adventure': 'Adventure / Western / War',
+        'Anime Horror': 'Science Fiction / Fantasy / Horror',
+        'Anime Sci-Fi': 'Science Fiction / Fantasy / Horror',
+        'Art & Design': 'Arts / Culture (without music)',
+        'Arts': 'Arts / Culture (without music)',
+        'B-Movie Horror': 'Science Fiction / Fantasy / Horror',
+        'Best of British Humor': 'Comedy',
+        'Biographical Documentaries': 'Documentary',
+        'Blockbusters': 'Movie / Drama',
+        'Career & Finance': 'Movie / Drama',
+        'Cartoons': 'Movie / Drama',
+        'Celebrity & Gossip': 'Movie / Drama',
+        'Classic Comedies': 'Comedy',
+        'Classic Dramas': 'Movie / Drama',
+        'Classic Movie Musicals': 'Movie / Drama',
+        'Classic Rock': 'Movie / Drama',
+        'Classic Sci-Fi & Fantasy': 'Science Fiction / Fantasy / Horror',
+        'Classic Stage Musicals': 'Movie / Drama',
+        'Classic War Stories': 'Adventure / Western / War',
+        'Classic Westerns': 'Adventure / Western / War',
+        'Coming of Age': 'Movie / Drama',
+        'Contemporary Movie Musicals': 'Musical / Opera',
+        'Creature Features': 'Science Fiction / Fantasy / Horror',
+        'Crime Action': 'Detective / Thriller',
+        'Crime Documentaries': 'Documentary',
+        'Crime Thrillers': 'Detective / Thriller',
+        'Cult Comedies': 'Comedy',
+        'Cult Horror': 'Science Fiction / Fantasy / Horror',
+        'Deadly Disasters': 'Soap / Melodrama / Folkloric',
+        'Erotic Thrillers': 'Adult drama / Movie',
+        'Espionage Thrillers': 'Detective / Thriller',
+        'Experimental': 'Experimental Film / Video',
+        'Faith & Spirituality Documentaries' : 'Documentary',
+        'Faith & Spirituality Feature Films': 'Serious / Classical / Religious / ' +
+                                              'Historical movie / Drama',
+        'Family Adventures': 'Adventure / Western / War',
+        'Family Animation': 'Movie / Drama',
+        'Family Classics': 'Movie / Drama',
+        'Family Comedies': 'Comedy',
+        'Family Dramas': 'Movie / Drama',
+        'Family Sci-Fi & Fantasy': 'Science Fiction / Fantasy / Horror',
+        'Fantasy': 'Science Fiction / Fantasy / Horror',
+        'Fighting & Self Defense': 'Movie / Drama',
+        'Foreign Action & Adventure': 'Adventure / Western / War',
+        'Foreign Art House': 'Film / Cinema',
+        'Foreign Classic Comedies': 'Comedy',
+        'Foreign Classic Dramas': 'Movie / Drama',
+        'Foreign Comedies': 'Comedy',
+        'Foreign Documentaries': 'Documentary',
+        'Foreign Gay & Lesbian': 'Movie / Drama',
+        'Foreign Horror': 'Science Fiction / Fantasy / Horror',
+        'Foreign Musicals': 'Musical / Opera',
+        'Foreign Romance': 'Romance',
+        'Foreign Sci-Fi & Fantasy': 'Science Fiction / Fantasy / Horror',
+        'Foreign Thrillers': 'Detecive / Thriller',
+        'Gay & Lesbian Dramas': 'Movie / Drama',
+        'Gay': 'Romance',
+        'General Indie Film & Short Films': 'Film / Cinema',
+        'Heist Films': 'Detective / Thriller',
+        'Historical Documentaries': 'Documentary',
+        'Horror Classics': 'Science Fiction / Fantasy / Horror',
+        'Indie Action': 'Film / Cinema',
+        'Indie Comedies': 'Comedy',
+        'Indie Documentaries': 'Documentary',
+        'Indie Dramas': 'Film / Cinema',
+        'Indie Romance': 'Romance',
+        'Indie Suspense & Thriller': 'Film / Cinema',
+        'Inspirational Biographies': 'Soap / Melodrama / Folkloric',
+        'Inspirational Stories for Kids': 'Soap / Melodrama / Folkloric',
+        'Inspirational Stories': 'Soap / Melodrama / Folkloric',
+        'Investigative Journalism': 'Magazines / Reports / Documentary',
+        'Kids\' Anime': 'Movie / Drama',
+        'Kids\' Music': 'Movie / Drama',
+        'Late Night Comedies': 'Comedy',
+        'Latino Comedies': 'Comedy',
+        'Martial Arts': 'Movie / Drama',
+        'Men\'s Interest': 'Movie / Drama',
+        'Military & War Action': 'Adventure / Western / War',
+        'Military Documentaries': 'Documentary',
+        'Miscellaneous Documentaries': 'Documentary',
+        'Mobster': 'Detective / Thriller',
+        'Mockumentaries': 'Comedy',
+        'Monsters': 'Science Fiction / Fantasy / Horror',
+        'Music Documentaries': 'Documentary',
+        'Music': 'Movie / Drama',
+        'Mystery': 'Detective / Thriller',
+        'Pets': 'Movie / Drama',
+        'Poker & Gambling': 'Movie / Drama',
+        'Political Comedies': 'Comedy',
+        'Political Documentaries': 'Documentary',
+        'Political Thrillers': 'Detective / Thriller',
+        'Politics': 'Movie / Drama',
+        'Psychological Thrillers': 'Detective / Thriller',
+        'Religion & Mythology Documentaries': 'Documentary',
+        'Religious & Spiritual Dramas': 'Serious / Classical / Religious / ' +
+                                        'Historical Movie / Drama',
+        'Romance Classics': 'Romance',
+        'Romance': 'Romance',
+        'Romantic Comedies': 'Romance',
+        'Romantic Dramas': 'Romance',
+        'Satanic Stories': 'Science Fiction / Fantasy / Horror',
+        'Sci-Fi Adventure': 'Science Fiction / Fantasy / Horror',
+        'Sci-Fi Cult Classics': 'Science Fiction / Fantasy / Horror',
+        'Sci-Fi Dramas': 'Science Fiction / Fantasy / Horror',
+        'Sci-Fi Horror': 'Science Fiction / Fantasy / Horror',
+        'Sci-Fi Thrillers': 'Science Fiction / Fantasy / Horror',
+        'Science and Nature Documentaries': 'Documentary',
+        'Science': 'Movie / Drama',
+        'Screwball': 'Comedy',
+        'Showbiz Comedies': 'Comedy',
+        'Slapstick': 'Comedy',
+        'Slashers and Serial Killers': 'Detective / Thriller',
+        'Social & Cultural Documentaries': 'Documentary',
+        'Spiritual Mysteries': 'Serious / Classical / Religious / Historical movie / Drama',
+        'Spoofs and Satire': 'Comedy',
+        'Sports Comedies': 'Comedy',
+        'Sports Documentaries': 'Documentary',
+        'Sports': 'Sports',
+        'Stand-Up': 'Comedy',
+        'Super Swashbucklers': 'Adventure / Western / War',
+        'Supernatural Horror': 'Science Fiction / Fantasy / Horror',
+        'Supernatural Sci-Fi': 'Science Fiction / Fantasy / Horror',
+        'Supernatural Thrillers': 'Detective / Thriller',
+        'Suspense': 'Detective / Thriller',
+        'Teen Comedies': 'Comedy',
+        'Teen Dramas': 'Movie / Drama',
+        'Travel & Adventure Documentaries': 'Documentary',
+        'Travel': 'Movie / drama',
+        'Vampires': 'Science Fiction / Fantasy / Horror',
+        'Werewolves': 'Science Fiction / Fantasy / Horror',
+        'Westerns': 'Adventure / Western / War',
+        'Women\'s Interest': 'Movie / Drama',
+        'Zombies': 'Science Fiction / Fantasy / Horror'
+    }
+
+    tvdict = {
+        'Action Classics': 'Show / Game show',
+        'Action Sci-Fi & Fantasy': 'Show / Game show',
+        'Action Thrillers': 'Show / Game show',
+        'Adventures': 'Show / Game show',
+        'African-American Action': 'Show / Game show',
+        'African-American Comedies': 'Show / Game show',
+        'African-American Romance': 'Show / Game show',
+        'Ages 2-4': 'Children\'s / Youth Programmes',
+        'Alien Sci-Fi': 'Show / Game show',
+        'Animal Tales': 'Nature / Animals / Environment',
+        'Animals': 'Nature / Animals / Environment',
+        'Anime Action & Adventure': 'Show / Game show',
+        'Anime Horror': 'Show / Game show',
+        'Anime Sci-Fi': 'Show / Game show',
+        'Anime Series': 'Show / Game show',
+        'Art & Design': 'Arts / Culture (without music)',
+        'Arts': 'Arts / Culture (without music)',
+        'B-Movie Horror': 'Show / Game show',
+        'Best of British Humor': 'Show / Game show',
+        'Biographical Documentaries': 'Remarkable people',
+        'Blockbusters': 'Show / Game show',
+        'Boating & Sailing': 'Leisure Hobbies',
+        'Car Culture': 'Leisure Hobbies',
+        'Career & Finance': 'Social / Political issues / Economics',
+        'Cartoons': 'Cartoons / Puppets',
+        'Celebrity & Gossip': 'Popular culture / Traditional arts',
+        'Classic Comedies': 'Show / Game show',
+        'Classic Dramas': 'Show / Game show',
+        'Classic Movie Musicals': 'Musical / Opera',
+        'Classic Rock': 'Rock / Pop',
+        'Classic Sci-Fi & Fantasy': 'Show / Game show',
+        'Classic Stage Musicals': 'Performing Arts',
+        'Classic War Stories': 'Show / Game show',
+        'Classic Westerns': 'Show / Game show',
+        'Coming of Age': 'Show / Game show',
+        'Consumer Products & Software': 'Technology / Natural sciences',
+        'Cooking Instruction': 'Cooking',
+        'Creature Features': 'Show / Game show',
+        'Crime Action': 'Show / Game show',
+        'Crime Documentaries': 'Documentary',
+        'Crime Thrillers': 'Show / Game show',
+        'Cult Comedies': 'Show / Game show',
+        'Cult Horror': 'Show / Game show',
+        'Deadly Disasters': 'Show / Game show',
+        'Disco': 'Rock / Pop',
+        'DIY & How To': 'Handicraft',
+        'Education & Guidance': 'Further Education',
+        'Entertaining': 'Cooking',
+        'Erotic Thrillers': 'Adult drama / Movie',
+        'Espionage Thrillers': 'Show / Game show',
+        'Experimental': 'Experimental Film / Video',
+        'Fails & Pranks': 'Show / Game Show',
+        'Faith & Spirituality Documentaries' : 'Documentary',
+        'Family Adventures': 'Show / Game show',
+        'Family Animation': 'Cartoons / Puppets',
+        'Family Classics': 'Show / Game show',
+        'Family Comedies': 'Show / Game show',
+        'Family Dramas': 'Show / Game show',
+        'Family Sci-Fi & Fantasy': 'Show / Game show',
+        'Fantasy': 'Show / Game show',
+        'Fighting & Self Defense': 'Martial Sports',
+        'Fishing': 'Leisure Hobbies',
+        'Food & Wine': 'Cooking',
+        'Food Stories': 'Cooking',
+        'Foreign Action & Adventure': 'Show / Game show',
+        'Foreign Classic Comedies': 'Show / Game show',
+        'Foreign Classic Dramas': 'Show / Game show',
+        'Foreign Comedies': 'Show / Game show',
+        'Foreign Documentaries': 'Documentary',
+        'Foreign Gay & Lesbian': 'Show / Game show',
+        'Foreign Horror': 'Show / Game show',
+        'Foreign Musicals': 'Musical / Opera',
+        'Foreign Romance': 'Show / Game show',
+        'Foreign Sci-Fi & Fantasy': 'Show / Game show',
+        'Foreign Thrillers': 'Detecive / Thriller',
+        'Gaming': 'New media',
+        'Gay & Lesbian Dramas': 'Show / Game show',
+        'Gay': 'Show / Game show',
+        'General News': 'News / Current Affairs',
+        'Heist Films': 'Show / Game show',
+        'Hip-Hop/Rap': 'Rock / Pop',
+        'Historical Documentaries': 'Documentary',
+        'History & Social Studies': 'Social / Political issues / Economics',
+        'Home & Garden': 'Handicraft',
+        'Home Improvement': 'Handicraft',
+        'Horror Classics': 'Show / Game show',
+        'Hunting': 'Leisure Hobbies',
+        'Indie Action': 'Show / Game show',
+        'Indie Comedies': 'Show / Game show',
+        'Indie Documentaries': 'Show / Game show',
+        'Indie Dramas': 'Show / Game show',
+        'Indie Romance': 'Show / Game show',
+        'Indie Suspense & Thriller': 'Show / Game show',
+        'Inspirational Biographies': 'Remarkable People',
+        'Inspirational Stories for Kids': 'Children\'s / Youth programs',
+        'Inspirational Stories': 'Remarkable People',
+        'Investigative Journalism': 'Magazines / Reports / Documentary',
+        'Kids\' Anime': 'Cartoons / Puppets',
+        'Kids\' Music': 'Children\'s / Youth programs',
+        'Kids\' TV': 'Children\'s / Youth programs',
+        'Late Night Comedies': 'Show / Game show',
+        'Late Night TV': 'Show / Game show',
+        'Latino Comedies': 'Show / Game show',
+        'Magic & Illusion': 'Performing Arts',
+        'Martial Arts': 'Martial sports',
+        'Men\'s Interest': 'Show / Game show',
+        'Military & War Action': 'Show / Game show',
+        'Military Documentaries': 'Documentary',
+        'Mindfulness & Prayer': 'Social / Spiritual Sciences',
+        'Miscellaneous Documentaries': 'Documentary',
+        'Mobster': 'Show / Game show',
+        'Mockumentaries': 'Show / Game show',
+        'Monsters': 'Show / Game show',
+        'Music Documentaries': 'Documentary',
+        'Music': 'Music / Ballet / Dance',
+        'Must-See Concerts': 'Performing arts',
+        'Mystery': 'Show / Game show',
+        'Pets': 'Nature / Animals / Environment',
+        'Poker & Gambling': 'Leisure hobbies',
+        'Political Comedies': 'Show / Game show',
+        'Political Documentaries': 'Documentary',
+        'Political Thrillers': 'Show / Game show',
+        'Politics': 'Social / Political issues / Economics',
+        'Pop': 'Rock / Pop',
+        'Prayer & Spiritual Growth': 'Social / Spiritual Sciences',
+        'Psychological Thrillers': 'Show / Game show',
+        'Punk Rock': 'Rock / Pop',
+        'R&B/Soul': 'Rock / Pop',
+        'Reggae': 'Rock / Pop',
+        'Religion & Mythology Documentaries': 'Documentary',
+        'Religious & Spiritual Dramas': 'Social / Spiritual Sciences',
+        'Rock': 'Rock / Pop',
+        'Romance Classics': 'Show / Game show',
+        'Show / Game show': 'Show / Game show',
+        'Romantic Comedies': 'Show / Game show',
+        'Romantic Dramas': 'Show / Game show',
+        'Satanic Stories': 'Show / Game show',
+        'Sci-Fi Adventure': 'Show / Game show',
+        'Sci-Fi Cult Classics': 'Show / Game show',
+        'Sci-Fi Dramas': 'Show / Game show',
+        'Sci-Fi Horror': 'Show / Game show',
+        'Sci-Fi Thrillers': 'Show / Game show',
+        'Science and Nature Documentaries': 'Education / Science / Factual Topics',
+        'Science': 'Education / Science / Factual Topics',
+        'Screwball': 'Show / Game show',
+        'Showbiz Comedies': 'Show / Game show',
+        'Singer-Songwriters': 'Folk / Traditional Music',
+        'Sketch Comedies': 'Show / Game show',
+        'Slapstick': 'Show / Game show',
+        'Slashers and Serial Killers': 'Show / Game show',
+        'Social & Cultural Documentaries': 'Social / Political Issues / Economics',
+        'Spiritual Mysteries': 'Social / Spiritual sciences',
+        'Spoofs and Satire': 'Show / Game show',
+        'Sports & Sports Highlights': 'Sports magazine',
+        'Sports Comedies': 'Show / Game show',
+        'Sports Documentaries': 'Sports magazines',
+        'Sports': 'Sports',
+        'Stand-Up': 'Show / Game show',
+        'Super Swashbucklers': 'Show / Game show',
+        'Supernatural Horror': 'Show / Game show',
+        'Supernatural Sci-Fi': 'Show / Game show',
+        'Supernatural Thrillers': 'Show / Game show',
+        'Suspense': 'Show / Game show',
+        'Talk & Variety': 'Talk show',
+        'Teen Comedies': 'Show / Game show',
+        'Teen Dramas': 'Show / Game show',
+        'Travel & Adventure Documentaries': 'Documentary',
+        'Travel': 'Tourism/Travel',
+        'Vampires': 'Show / Game show',
+        'Video Gameplay & Walkthroughs': 'New media',
+        'Video Games': 'New media',
+        'Werewolves': 'Show / Game show',
+        'Westerns': 'Show / Game show',
+        'Women\'s Interest': 'Show / Game show',
+        'World': 'Serious music / Classical music',
+        'Zombies': 'Show / Game show'
+    }
+
+    if xtype == 'film':
+        if subgenre in moviedict:
+            catlist.append(moviedict[subgenre])
+    else:
+        if subgenre in tvdict:
+            catlist.append(tvdict[subgenre])
+
+    catlist = set(catlist)
+    return catlist
+
+def hextoangle(hexc):
+    ''' change hex value to circular degree '''
+    hexvalue = int(hexc, 16)
+    anglevalue = hexvalue/255*360
+    anglevalue = round(anglevalue)
+    return anglevalue
+
+def piconget(pid, mnpicon, picndir, piconslug, hxclr, colrful=False, brite=False):
     """ Function for fetching and manipulating picons """
 
     if direxists(picndir):
@@ -180,19 +569,50 @@ def piconget(pid, mnpicon, picndir, piconslug, hxclr):
 
         if (not fileexists(savename, False)) or (overwritepicons):
             _f = urllib.request.urlopen(geturl)
-            with Image(file=_f) as img:
-                result = re.match("^(?:#)?[0-9a-fA-F]{3,6}$", str(hxclr))
-                if result:
-                    if not hxclr.startswith("#"):
-                        hxclr = "#" + hxclr
-                    img.background_color = Color(hxclr)
-                elif hxclr == "transparent":
-                    img.background_color = Color('transparent')
+
+            if colrful or brite:
+                hex1 = pid[-2:]
+                angle1 = hextoangle(hex1)
+                if angle1 - 60 <= 0:
+                    angle2 = angle1 + 300
                 else:
-                    logging.error("Background colour option must follow '#FFFFFF' hex format")
-                    sys.exit()
-                img.extent(width=576, height=576, x=0, y=-144)
-                img.save(filename=savename)
+                    angle2 = angle1 - 60
+
+                with Image() as canvas:
+                    library.MagickSetSize(canvas.wand, 576, 576)
+                    if CBRIGHT:
+                        brpc = '100%'
+                    else:
+                        brpc = '20%'
+
+                    canvas.options['gradient:angle'] = str(angle1)
+                    canvas.pseudo(576, 576, "gradient:hsb(" + str(angle1) + ", 100%, " +
+                                  str(brpc) + ")" + "-hsb(" + str(angle2) + ", 100%, " +
+                                  str(brpc) + ")")
+
+                    with Image(file=_f) as img:
+
+                        img.background_color = Color('transparent')
+                        img.extent(width=576, height=576, x=0, y=-144)
+                        img.composite(canvas, operator='dst_over', left=0, top=0)
+                        img.save(filename=savename)
+
+            else:
+                result = re.match("^(?:#)?[0-9a-fA-F]{3,6}$", str(hxclr))
+                with Image(file=_f) as img:
+                    if result:
+                        if not hxclr.startswith("#"):
+                            hxclr = "#" + hxclr
+                        img.background_color = Color(hxclr)
+                    elif hxclr == "transparent":
+                        img.background_color = Color('transparent')
+                    else:
+                        logging.error("Background colour must match '#FFFFFF' hex format")
+                        sys.exit()
+
+                    img.extent(width=576, height=576, x=0, y=-144)
+                    img.save(filename=savename)
+       #     img.save(filename=savename)
             _f.close()
     else:
         try:
@@ -268,7 +688,8 @@ def main():
         attrib={"generator-info-name":"Zang's Pluto.TV TVHeadend generator",\
                 "generator-info-url":"https://github.com/zang74/PlutoIPTV"})
 
-        badchannels = ["Announcement", "Privacy Policy"]
+        badchannels = ["Announcement", "Privacy Policy", "Inside Vizio"]
+
 
         for channel in data:
 
@@ -310,7 +731,7 @@ def main():
                         'includeExtendedEvents': 'false',
                         'sid': sid,
                         'userId': '',
-                        'serverSideAds': 'true',
+                        'serverSideAds': 'false',
                         'terminate': 'false',
                         'marketingRegion': 'US'
                     }
@@ -327,7 +748,8 @@ def main():
                     if picondir:
                         piconslug = slug + ".plutotv"
                         logo = "file://" + picondir + piconslug + ".png"
-                        piconget(deviceid, monopicon, picondir, piconslug, hexcolour)
+                        piconget(deviceid, monopicon, picondir, piconslug,
+                                 hexcolour, COLOURFUL, CBRIGHT)
 
                     m3uoutput = ("\n#EXTINF:-1 tvg-name=\"" + chname + "\" tvg-id=\"" +
                                  deviceid + ".plutotv\" " + "tvg-logo=\"" + logo +
@@ -360,36 +782,30 @@ def main():
 
                 for episodes in channel['timelines']:
 
-                    categorylist = []
                     epdescription = episodes['episode']['description']
                     epdescription = epdescription.replace('\x92', '')
-                    if episodes['episode']['genre']:
-                        categorylist.append(episodes['episode']['genre'])
-                    if episodes['episode']['subGenre']:
-                        categorylist.append(episodes['episode']['subGenre'])
-                    if episodes['episode']['series']['type'] == "film":
-                        categorylist.append("movie")
-                    elif episodes['episode']['series']['type'] == "live":
-                        categorylist.append('news')
-                    else:
-                        categorylist.append('series')
+
+                    epcategory = channel['category']
+                    eptype = episodes['episode']['series']['type']
+                    epsubgenre = episodes['episode']['subGenre']
+
+                    epcats = tvhcategory(eptype, epcategory, epsubgenre)
+
                     eppremiere = episodes['episode']['firstAired']
                     tpremiere = datetime.fromisoformat(eppremiere[:-1])
                     epdate = tpremiere.strftime("%Y%m%d")
-                    epshow = episodes['episode']['name']
+                    eptitle = episodes['episode']['name']
                     eprating = episodes['episode']['rating']
-                    eptitle = episodes['title']
+                    epshow = episodes['title']
                     duration = episodes['episode']['duration']
                     epstart = episodes['start']
                     epstop = episodes['stop']
                     epnumber = episodes['episode']['number']
                     # epicon = episodes['episode']['number']
                     starttime = datetime.fromisoformat(epstart[:-1])
-                    tstart = localtimezone.localize(starttime)
-                    localstart = tstart.strftime("%Y%m%d%H%M%S %z")
+                    localstart = starttime.strftime("%Y%m%d%H%M%S %z")
                     stoptime = datetime.fromisoformat(epstop[:-1])
-                    tstop = localtimezone.localize(stoptime)
-                    localstop = tstop.strftime("%Y%m%d%H%M%S %z")
+                    localstop = stoptime.strftime("%Y%m%d%H%M%S %z")
                     # idslug = channel['slug'] + ".plutotv"
                     if channel['category'] == "Latino":
                         eplang = "es"
@@ -401,24 +817,33 @@ def main():
 
                     eptime = duration / 1000 / 60
 
+                    #tvhcategories()
+
                     xmlepisode = lmntree.SubElement(
-                        xml, "programme", start=localstart, stop=localstop, channel=tvgidslug
+                        xml, "programme", start=localstart, stop=localstop,
+                        channel=tvgidslug
                         )
-                    lmntree.SubElement(xmlepisode, "title", lang=eplang).text = epshow
+                    lmntree.SubElement(xmlepisode, "title",
+                                       lang=eplang).text = epshow
                     if eptitle:
-                        lmntree.SubElement(xmlepisode, "sub-title", lang=eplang).text = eptitle
-                    lmntree.SubElement(xmlepisode, "desc", lang=eplang).text = epdescription
+                        lmntree.SubElement(xmlepisode, "sub-title",
+                                           lang=eplang).text = eptitle
+                    lmntree.SubElement(xmlepisode, "desc",
+                                       lang=eplang).text = epdescription
                     # xmlcredits = lmntree.SubElement(xmlepisode, "credits")
                     lmntree.SubElement(xmlepisode, "date").text = epdate
-                    for cat in categorylist:
+
+                    for cat in epcats:
                         lmntree.SubElement(xmlepisode, "category", lang=eplang).text = cat
-                    lmntree.SubElement(xmlepisode, "length", units='minutes').text = str(eptime)
+
+                    lmntree.SubElement(xmlepisode, "length",
+                                       units='minutes').text = str(eptime)
                     lmntree.SubElement(xmlepisode, "episode-num",
                                        system='onscreen').text = str(epnumber)
                     xmlrating = lmntree.SubElement(xmlepisode, "rating", system='US')
                     lmntree.SubElement(xmlrating, "value").text = eprating
-
-
+            else:
+                logging.info("Skipping 'fake' channel %s.", channel['name'])
         if not debugmode:
             m3ufile.close()
         else:
@@ -441,7 +866,8 @@ def main():
         root = xmltvtree.getroot()
 
         # sort the first layer
-        root[:] = sorted(root, key=lambda child: (child.tag, child.get('id'), child.get('channel')))
+        root[:] = sorted(root, key=lambda child:
+                         (child.tag, child.get('id'), child.get('channel')))
         xmldata = lmntree.tostring(root, pretty_print=True, encoding="utf-8",
                                    xml_declaration=True,
                                    doctype='<!DOCTYPE tv SYSTEM "xmltv.dtd">')
