@@ -81,15 +81,15 @@ A hexidecimal RGB value (#1F1F1F) to be used as the secondary colour in backgrou
 
 #### --angle (optional)
 
-If used with --colourful, --bright or combined --bgcolour1 and bgcolour2, defines the angle used for the background gradient. Defaults to "random"[^1].
+If used with --colourful, --bright or combined --bgcolour1 and bgcolour2, defines the angle used for the background gradient. Defaults to "random"<sup>1</sup>.
 
 #### --colourful (optional)
 
-A bit misleading a name, but creates a muted gradient background for the picons. Colours are by default "random"[^1]. The angle of the gradient can be set using --angle, but can also defaults to "random"<sup>*</sup>.
+A bit misleading a name, but creates a muted gradient background for the picons. Colours are by default "random"<sup>1</sup>. The angle of the gradient can be set using --angle, but can also defaults to "random"<sup>1</sup>.
 
 #### --bright (optional)
 
-Creates an intensely colourful background gradient for the picons. Same idea as --colourful, but looks best with --monopicon. Also defaults colour choice to "random"[^1].
+Creates an intensely colourful background gradient for the picons. Same idea as --colourful, but looks best with --monopicon. Also defaults colour choice to "random"<sup>1</sup>.
 
 #### --monopicon (optional)
 
@@ -99,4 +99,4 @@ Download white logo of default colour logo. Can be used with all other backgroun
 
 This option forces an overwrite of those picon files. By default, if the picondir option is selected, the script will only download those icons it cannot find in the given directory. This dramatically speeds up the script and saves needless downloads. Can be useful if icons/channels change or as an once-a-week option. 
 
-[^1]: "Random" is not truly random, but a value created using a portion of the UID of the channel. As such, it may seem random across different channel picons, but that value remains constant for a given channel.*
+*<sup>1</sup>"Random" is not truly random, but a value created using a portion of the UID of the channel. As such, it may seem random across different channel picons, but that value remains constant for a given channel.*
