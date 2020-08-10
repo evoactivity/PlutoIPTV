@@ -57,7 +57,7 @@ Debug mode will ignore all directory options and create the subdirectory ./pluto
 
 #### --time (optional)
 
-As it is now, Pluto only delivers a maximum of about 9-10 hours of EPG. The script defaults to 8. If you need more you can push it, but this setting was added more to limit EPG.
+As it is now, Pluto only delivers a maximum of about 9-10 hours of EPG. The script defaults to 8. If you need more you can push it, but this setting was added more to limit EPG than to add to it.
 
 #### --longitude, --latitude (optional)
 
@@ -65,11 +65,11 @@ Pluto.tv stream urls are autopopulated with your geolocation as decimal longitud
 
 #### --dir, --cache, --epg, --log (optional)
 
-Pretty self-explanatory — Where you want the individual files to go. The default directory is next to the script. Filenames themselves are static and can't be changed.
+Pretty self-explanatory — Where you want the individual files to go. The default directory is next to the script. Filenames themselves are static and can't be changed. --dir is M3U save location.
 
 #### --picondir (optional)
 
-A location to store channel logos as "picons". Logo images will be pulled from the pluto.tv site, expanded into a square picon (no cropping takes place, only expansion of the canvas), and saved with a channel-identifiable filename in the directory submitted. If not used with --bgcolour, --colourful or --bright, the image background remains transparent.
+A location to store channel logos as "picons". Logo images will be pulled from the pluto.tv site, expanded into a square picon (no cropping takes place, only expansion of the canvas), and saved with a channel-identifiable filename in the directory submitted. If not used with --bgcolour1, --colourful or --bright, the image background remains transparent.
 
 #### --bgcolour1 (optional)
 
@@ -81,21 +81,22 @@ A hexidecimal RGB value (#1F1F1F) to be used as the secondary colour in backgrou
 
 #### --angle (optional)
 
-If used with --colourful, --bright or combined --bgcolour1 and bgcolour2, defines the angle used for the background gradient. Defaults to "random".
+If used with --colourful, --bright or combined --bgcolour1 and bgcolour2, defines the angle used for the background gradient. Defaults to "random"<sup>*</sup>.
 
 #### --colourful (optional)
 
-A bit misleading a name, but creates a muted gradient background for the picons. Colours and are generated using the hex ID string of the channel. The angle of the gradient can be set using --angle, but can also be left to default (generated using the hex ID string of the channel).
+A bit misleading a name, but creates a muted gradient background for the picons. Colours are by default "random"<sup>*</sup>. The angle of the gradient can be set using --angle, but can also defaults to "random"<sup>*</sup>.
 
 #### --bright (optional)
 
-Creates an intensely colourful background gradient for the picons. Same idea as --colourful, but looks best with --monopicon.
+Creates an intensely colourful background gradient for the picons. Same idea as --colourful, but looks best with --monopicon. Also defaults colour choice to "random"<sup>*</sup>.
 
 #### --monopicon (optional)
 
-Download white logo on transparency instead of default colour logo on transparency. Can be combined with --colour
+Download white logo of default colour logo. Can be used with all other background options
 
-#### -- overwritepicons (optional)
+#### --overwritepicons (optional)
 
-By default, if the picondir option is selected, the script will only download those icons it cannot find in the given directory. This dramatically speeds up the script and saves needless downloads. This option forces an overwrite of those picon files. Can be useful if icons/channels change or as an once-a-week option. 
+This option forces an overwrite of those picon files. By default, if the picondir option is selected, the script will only download those icons it cannot find in the given directory. This dramatically speeds up the script and saves needless downloads. Can be useful if icons/channels change or as an once-a-week option. 
 
+*<sup>*</sup>"Random" is not truly random, but a value created using a portion of the UID of the channel. As such, it may seem random across different channel picons, but that value remains constant for a given channel.*
