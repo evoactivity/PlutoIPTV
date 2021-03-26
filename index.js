@@ -7,6 +7,7 @@ const fs = require('fs-extra');
 const uuid4 = require('uuid').v4;
 const uuid1 = require('uuid').v1;
 const url = require('url');
+const favorites = require('./favorites');
 
 const plutoIPTV = {
   grabJSON: function (callback) {
@@ -57,6 +58,19 @@ const plutoIPTV = {
 module.exports = plutoIPTV;
 
 plutoIPTV.grabJSON(function (err, channels) {
+
+  /////////////////////
+  // Filter Channels //
+  /////////////////////
+  const favoritesPath = './pluto-favorites';
+  const favoritesFilter = favorites.from(favoritesPath);
+  if(!favoritesFilter.isEmpty()) {
+    channels = channels.filter(favoritesFilter);
+    favoritesFilter.printSummary();
+  } else {
+    console.log(`[DEBUG] No favorites specified (${favoritesPath}), loading all channels.`)
+  }
+
   ///////////////////
   // M3U8 Playlist //
   ///////////////////
