@@ -3,6 +3,9 @@
   "version": "1.2.0",
   "description": "pluto.tv to XMLTV & M3U converter",
   "main": "index.js",
+  "engines": {
+    "node": ">=10"
+  },
   "dependencies": {
     "fs-extra": "^9.0.0",
     "jsontoxml": "^1.0.1",
