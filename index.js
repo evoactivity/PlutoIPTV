@@ -196,6 +196,16 @@ ${m3uUrl}
                 text: programme.episode.subGenre,
               },
               {
+                name: 'category',
+                attrs: { lang: 'en' },
+                text: programme.episode.series.type,
+              },
+              {
+                name: 'category',
+                attrs: { lang: 'en' },
+                text: channel.category,
+              },
+              {
                 name: 'episode-num',
                 attrs: { system: 'onscreen' },
                 text: programme.episode.number,
