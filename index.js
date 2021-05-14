@@ -200,6 +200,10 @@ ${m3uUrl}
                 attrs: { system: 'onscreen' },
                 text: programme.episode.number,
               },
+              {
+                name: 'icon',
+                attrs: { src: programme.episode.poster.path},
+              },
             ],
           });
         });
