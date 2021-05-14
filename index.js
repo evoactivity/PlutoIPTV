@@ -38,7 +38,7 @@ const plutoIPTV = {
 
     // 2020-03-25%2005%3A00%3A00.000%2B0000
     let stopTime = encodeURIComponent(
-      moment().add(8, 'hours').format('YYYY-MM-DD HH:00:00.000ZZ')
+      moment().add(48, 'hours').format('YYYY-MM-DD HH:00:00.000ZZ')
     );
 
     let url = `http://api.pluto.tv/v2/channels?start=${startTime}&stop=${stopTime}`;
