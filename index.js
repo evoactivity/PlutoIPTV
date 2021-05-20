@@ -108,13 +108,13 @@ plutoIPTV.grabJSON(function (err, channels) {
       m3uUrl = m3uUrl.toString();
 
       let slug = channel.slug;
-      let logo = channel.solidLogoPNG.path;
+      let logo = channel.colorLogoPNG.path;
       let group = channel.category;
       let name = channel.name;
 
       m3u8 =
         m3u8 +
-        `#EXTINF:0 channel-id="${slug}" tvg-logo="${logo}" group-title="${group}", ${name}
+        `#EXTINF:0 tvg-id="${slug}" tvg-logo="${logo}" group-title="${group}", ${name}
 ${m3uUrl}
 
 `;
@@ -142,7 +142,7 @@ ${m3uUrl}
           { name: 'display-name', text: channel.name },
           { name: 'display-name', text: channel.number },
           { name: 'desc', text: channel.summary },
-          { name: 'icon', attrs: { src: channel.solidLogoPNG.path } },
+          { name: 'icon', attrs: { src: channel.colorLogoPNG.path } },
         ],
       });
 
