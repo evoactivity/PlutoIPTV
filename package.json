@@ -1,6 +1,6 @@
 {
   "name": "pluto-iptv",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "pluto.tv to XMLTV & M3U converter",
   "main": "index.js",
   "engines": {
