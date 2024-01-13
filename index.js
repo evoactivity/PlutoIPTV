@@ -135,17 +135,6 @@ ${m3uUrl}
   //////////////
   channels.forEach((channel) => {
     if (channel.isStitched) {
-      tv.push({
-        name: 'channel',
-        attrs: { id: channel.slug },
-        children: [
-          { name: 'display-name', text: channel.name },
-          { name: 'display-name', text: channel.number },
-          { name: 'desc', text: channel.summary },
-          { name: 'icon', attrs: { src: channel.colorLogoPNG.path } },
-        ],
-      });
-
       //////////////
       // Episodes //
       //////////////
@@ -219,6 +208,17 @@ ${m3uUrl}
         });
       }
     }
+
+    tv.push({
+      name: 'channel',
+      attrs: { id: channel.slug },
+      children: [
+        { name: 'display-name', text: channel.name },
+        { name: 'display-name', text: channel.number },
+        { name: 'desc', text: channel.summary },
+        { name: 'icon', attrs: { src: channel.colorLogoPNG.path } },
+      ],
+    });
   });
 
   let epg = j2x(
