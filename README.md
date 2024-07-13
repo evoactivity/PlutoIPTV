@@ -6,6 +6,8 @@ Based on https://github.com/TylerB260/PlutoXML
 
 ## Usage
 
+## Install node  https://github.com/tj/n
+
 ### Run
 
 ```bash
